@@ -14,6 +14,12 @@ pub struct Refresh {
 }
 
 #[derive(Serialize, Debug)]
+pub struct ChangeUserPassword {
+    pub current_password: String,
+    pub new_password: String
+}
+
+#[derive(Serialize, Debug)]
 pub struct NewPassword {
     pub site: String,
     pub login: String,
@@ -103,8 +109,8 @@ impl Client {
         };
         match request {
             Ok(response) => {
-                // Ok response code to all POST to LessPass API is 200 or 201
-                if response.status() == 200 || response.status() == 201 {
+                // Ok response code to all POST to LessPass API is 200, 201 or 204
+                if response.status() == 200 || response.status() == 201 || response.status() == 204 {
                     Ok(response)
                 } else {
                     Err(format!("Error in POST request, unexpected status code {}", response.status()))
@@ -147,6 +153,16 @@ impl Client {
             // Cannot reach server by any reason
             Err(_) => Err(format!("Error making DELETE request to {}", url))
         }
+    }
+
+    pub async fn create_user(self: &Self, auth: &Auth) -> Result<(), String> {
+        let url = self.build_url("auth/users/");
+        self.post(&url, None, &auth).await.map(|_|())
+    }
+
+    pub async fn change_user_password(self: &Self, token: String, password: &ChangeUserPassword) -> Result<(), String> {
+        let url = self.build_url("auth/users/set_password/");
+        self.post(&url, Some(token), &password).await.map(|_|())
     }
 
     pub async fn create_token(self: &Self, email: String, password: String) -> Result<Token, String> {
