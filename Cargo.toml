@@ -3,7 +3,13 @@ name = "lesspass-client"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "lesspass-client"
+path = "src/main.rs"
+required-features = ["default"]
 
 [dependencies]
 chrono = { version="0.4", features = ["serde"] }
@@ -12,5 +18,12 @@ reqwest = { version = "~0.11", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 
+clap = { version = "~2.34", optional = true }
+env_logger = { version = "~0.9", optional = true }
+xdg = { version = "~2.4", optional = true }
+
 [dev-dependencies]
 mockito = "~0.30"
+
+[features]
+default = ["clap", "env_logger", "xdg"]

@@ -1,3 +1,9 @@
+//
+// lesspass-client
+// Copyright (C) 2021 Óscar García Amor <ogarcia@connectical.com>
+// Distributed under terms of the GNU GPLv3 license.
+//
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use reqwest::{Response, Url};
