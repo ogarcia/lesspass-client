@@ -1,0 +1,36 @@
+name: Test and build
+
+on: [push, pull_request]
+
+jobs:
+  test-build:
+    name: Test and build lesspass-client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --locked
+      - name: package
+        id: package
+        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
+        run: |
+          install -Dm755 "target/release/lesspass-client" "lesspass-client-${GITHUB_REF##*/}/lesspass-client"
+          install -Dm644 "README.md" "lesspass-client-${GITHUB_REF##*/}/README.md"
+          install -Dm644 "LICENSE" "lesspass-client-${GITHUB_REF##*/}/LICENSE"
+          tar cvJf "lesspass-client-${GITHUB_REF##*/}.tar.xz" "lesspass-client-${GITHUB_REF##*/}"
+          echo ::set-output name=version::${GITHUB_REF##*/}
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
+        with:
+          files: "lesspass-client-${{ steps.package.outputs.version }}.tar.xz"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
