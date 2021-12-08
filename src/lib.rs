@@ -182,4 +182,17 @@ impl Client {
         let url = self.build_url("passwords/");
         self.post(&url, Some(token), &password).await.map(|_|())
     }
+
+    pub async fn put_password(self: &Self, token: String, id: String, password: &NewPassword) -> Result<(), String> {
+        let path = format!("passwords/{}/", id);
+        let url = self.build_url(&path);
+        self.put(&url, token, &password).await.map(|_|())
+    }
+
+    pub async fn delete_password(self: &Self, token: String, id: String) -> Result<(), String> {
+        let path = format!("passwords/{}/", id);
+        let url = self.build_url(&path);
+        self.delete(&url, token).await.map(|_|())
+    }
+
 }

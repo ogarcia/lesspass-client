@@ -160,10 +160,73 @@ async fn post_password() {
         .match_header("authorization", "Bearer access-token")
         .match_body(Matcher::JsonString(request_body.to_string()))
         .create();
-    let post_password = client.post_password("access-token".to_string(), &password).await.unwrap();
     // Ok Response
+    let post_password = client.post_password("access-token".to_string(), &password).await.unwrap();
     assert_eq!((), post_password);
     // Bad response caused by token error
     let error_in_token = client.post_password("bad-token".to_string(), &password).await.unwrap_err();
     assert_eq!("Error in POST request, unexpected status code 501 Not Implemented", error_in_token);
+}
+
+#[tokio::test]
+async fn put_password() {
+    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let request_body = r#"
+{
+  "login": "updateuser@example.com",
+  "site": "update.example.com",
+  "uppercase": true,
+  "lowercase": true,
+  "numbers": false,
+  "symbols": false,
+  "length": 22,
+  "counter": 1,
+  "version": 2
+}
+    "#;
+    let password = NewPassword {
+        site: "update.example.com".to_string(),
+        login: "updateuser@example.com".to_string(),
+        lowercase: true,
+        uppercase: true,
+        symbols: false,
+        numbers: false,
+        length: 22,
+        counter: 1,
+        version: 2
+    };
+    let _m = mock("PUT", "/passwords/ce2835da-9047-43eb-a107-bad4f01d22a0/")
+        .with_status(200)
+        .with_header(JH.0, JH.1)
+        .match_header("authorization", "Bearer access-token")
+        .match_body(Matcher::JsonString(request_body.to_string()))
+        .create();
+    // Ok Response
+    let put_password = client.put_password("access-token".to_string(), "ce2835da-9047-43eb-a107-bad4f01d22a0".to_string(), &password).await.unwrap();
+    assert_eq!((), put_password);
+    // Bad response caused by token error
+    let error_in_token = client.put_password("bad-token".to_string(), "ce2835da-9047-43eb-a107-bad4f01d22a0".to_string(), &password).await.unwrap_err();
+    assert_eq!("Error in PUT request, unexpected status code 501 Not Implemented", error_in_token);
+    // Bad response caused by id error
+    let error_in_id = client.put_password("access-token".to_string(), "bad-id".to_string(), &password).await.unwrap_err();
+    assert_eq!("Error in PUT request, unexpected status code 501 Not Implemented", error_in_id);
+}
+
+#[tokio::test]
+async fn delete_password() {
+    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let _m = mock("DELETE", "/passwords/1c461df9-11eb-4bf1-976b-1c49d5598b8f/")
+        .with_status(204)
+        .with_header(JH.0, JH.1)
+        .match_header("authorization", "Bearer access-token")
+        .create();
+    // Ok Response
+    let delete_password = client.delete_password("access-token".to_string(), "1c461df9-11eb-4bf1-976b-1c49d5598b8f".to_string()).await.unwrap();
+    assert_eq!((), delete_password);
+    // Bad response caused by token error
+    let error_in_token = client.delete_password("bad-token".to_string(), "1c461df9-11eb-4bf1-976b-1c49d5598b8f".to_string()).await.unwrap_err();
+    assert_eq!("Error in DELETE request, unexpected status code 501 Not Implemented", error_in_token);
+    // Bad response caused by id error
+    let error_in_id = client.delete_password("access-token".to_string(), "bad-id".to_string()).await.unwrap_err();
+    assert_eq!("Error in DELETE request, unexpected status code 501 Not Implemented", error_in_id);
 }
