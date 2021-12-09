@@ -8,14 +8,16 @@
 extern crate log;
 extern crate clap;
 extern crate xdg;
-use clap::{crate_authors, crate_version, Arg, App, AppSettings, SubCommand};
+use clap::{crate_authors, crate_version, Arg, ArgMatches, App, AppSettings, SubCommand};
 use env_logger::Builder;
 use log::LevelFilter;
 use reqwest::Url;
 use xdg::BaseDirectories;
-use lesspass_client::{Auth, Client, Password, Token};
+use lesspass_client::{Auth, ChangeUserPassword, NewPassword, Password, Passwords, Token, Client};
 
 use std::{fs, path, process};
+
+const APP_NAME: &str = "lesspass-client";
 
 fn print_site(site: &Password) {
     println!("ID: {}", site.id);
@@ -29,6 +31,53 @@ fn print_site(site: &Password) {
     println!("Couter: {}", site.counter);
 }
 
+fn parse_password_matches(matches: &ArgMatches) -> NewPassword {
+    let lower = matches.is_present("lowercase");
+    let upper = matches.is_present("uppercase");
+    let numbers = matches.is_present("numbers");
+    let symbols = matches.is_present("symbols");
+    if lower && upper && numbers && symbols {
+        println!("Not all character sets can be excluded");
+        process::exit(0x0100);
+    }
+    // Matches values are strings, pase to integers
+    let length: u8 = match matches.value_of("length").unwrap_or("16").parse() {
+        Ok(length) => length,
+        Err(err) => {
+            println!("Cannot parse length: {}", err);
+            process::exit(0x0100);
+        }
+    };
+    let counter: u32 = match matches.value_of("counter").unwrap_or("1").parse() {
+        Ok(counter) => counter,
+        Err(err) => {
+            println!("Cannot parse counter: {}", err);
+            process::exit(0x0100);
+        }
+    };
+    // Min password length is 5 and max 35
+    if !(5..=35).contains(&length) {
+        println!("The minimum password length is 5 and the maximum is 35");
+        process::exit(0x0100);
+    }
+    // Counter cannot be 0
+    if counter == 0 {
+        println!("Invalid counter value");
+        process::exit(0x0100);
+    }
+    NewPassword {
+        site: matches.value_of("site").unwrap().to_string(),
+        login: matches.value_of("login").unwrap().to_string(),
+        lowercase: !lower,
+        uppercase: !upper,
+        symbols: !symbols,
+        numbers: !numbers,
+        length: length,
+        counter: counter,
+        version: 2
+    }
+}
+
 async fn refresh_token(client: &Client, token: String) -> Result<Token, String> {
     // If token is empty simply return an error
     if token == "" || token == "\n" {
@@ -38,12 +87,31 @@ async fn refresh_token(client: &Client, token: String) -> Result<Token, String> 
     client.refresh_token(token).await
 }
 
-async fn auth(client: &Client, token: String, user: Option<&str>, pass: Option<&str>) -> Result<Token, String> {
+async fn auth(client: &Client, user: Option<&str>, pass: Option<&str>) -> Token {
+    // Try to get token form cache file
+    let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).unwrap().place_cache_file("token") {
+        Ok(token_cache_file) => {
+            debug!("Using cache file {} for read and store token", token_cache_file.as_path().display());
+            token_cache_file
+        },
+        Err(err) => {
+            warn!("There is a problem accessing to cache file caused by {}, disabling cache", err);
+            path::PathBuf::new()
+        }
+    };
+    let token = match fs::read_to_string(token_cache_file.as_path()) {
+        Ok(token) => {
+            trace!("Current token '{}'", token);
+            token
+        },
+        Err(_) => String::from("")
+    };
+
     // Try refresh token first
-    match refresh_token(client, token).await {
+    let requested_token = match refresh_token(client, token).await {
         Ok(refreshed_token) => {
             info!("Token refreshed successfully");
-            Ok(refreshed_token)
+            refreshed_token
         },
         Err(_) => {
             // Token cannot be refreshed we need to obtain a new one
@@ -64,19 +132,55 @@ async fn auth(client: &Client, token: String, user: Option<&str>, pass: Option<&
                 }
             };
             trace!("Using {} (value is masked) as LESSPASS_PASS", "*".repeat(pass.len()));
-            client.create_token(user, pass).await
+            match client.create_token(user, pass).await {
+                Ok(token) => token,
+                Err(err) => {
+                    println!("{}", err);
+                    process::exit(0x0100);
+                }
+            }
         }
+    };
+
+    trace!("Access token '{}'", requested_token.access);
+    trace!("Refresh token '{}'", requested_token.refresh);
+
+    // Save new refresh token
+    if token_cache_file != path::PathBuf::new() {
+        match fs::write(token_cache_file.as_path(), &requested_token.refresh) {
+            Ok(_) => info!("Refreshed token stored successfully"),
+            Err(err) => warn!("There is a problem storing refreshed token file caused by {}", err)
+        };
     }
+
+    requested_token
+}
+
+
+async fn get_passwords(client: &Client, user: Option<&str>, pass: Option<&str>) -> Passwords {
+    // First auth to get token
+    let token = auth(&client, user, pass).await;
+    // Get the password list
+    match client.get_passwords(token.access).await {
+        Ok(passwords) => {
+            debug!("Password list obtained successfully");
+            return passwords
+        },
+        Err(err) => {
+            println!("{}", err);
+            process::exit(0x0100);
+        }
+    };
 }
 
 #[tokio::main]
 async fn main() {
-    pub const APP_NAME: &str = "lesspass-client";
 
     let matches = App::new(APP_NAME)
         .version(crate_version!())
         .author(crate_authors!())
         .setting(AppSettings::SubcommandRequiredElseHelp)
+        .setting(AppSettings::VersionlessSubcommands)
         .arg(Arg::with_name("host")
              .short("s")
              .long("server")
@@ -101,6 +205,7 @@ async fn main() {
         .subcommand(SubCommand::with_name("user")
                     .about("user related commands")
                     .setting(AppSettings::SubcommandRequiredElseHelp)
+                    .setting(AppSettings::VersionlessSubcommands)
                     .subcommand(SubCommand::with_name("create")
                                 .about("create new user")
                                 .setting(AppSettings::ArgRequiredElseHelp)
@@ -122,6 +227,7 @@ async fn main() {
         .subcommand(SubCommand::with_name("password")
                     .about("password related commands")
                     .setting(AppSettings::SubcommandRequiredElseHelp)
+                    .setting(AppSettings::VersionlessSubcommands)
                     .subcommand(SubCommand::with_name("add")
                                 .about("add new password")
                                 .setting(AppSettings::ArgRequiredElseHelp)
@@ -159,10 +265,10 @@ async fn main() {
                                      .takes_value(true)))
                     .subcommand(SubCommand::with_name("list")
                                 .about("list all passwords")
-                                .arg(Arg::with_name("long")
-                                     .help("long list")
-                                     .short("l")
-                                     .long("long")))
+                                .arg(Arg::with_name("full")
+                                     .help("get full list (not only sites)")
+                                     .short("f")
+                                     .long("full")))
                     .subcommand(SubCommand::with_name("show")
                                 .about("show one password")
                                 .setting(AppSettings::ArgRequiredElseHelp)
@@ -232,83 +338,128 @@ async fn main() {
         }
     };
 
-    // Try to get token form cache file
-    let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).unwrap().place_cache_file("token") {
-        Ok(token_cache_file) => {
-            debug!("Using cache file {} for read and store token", token_cache_file.as_path().display());
-            token_cache_file
-        },
-        Err(err) => {
-            warn!("There is a problem accessing to cache file caused by {}, disabling cache", err);
-            path::PathBuf::new()
-        }
-    };
-    let token = match fs::read_to_string(token_cache_file.as_path()) {
-        Ok(token) => {
-            trace!("Current token '{}'", token);
-            token
-        },
-        Err(_) => String::from("")
-    };
-
     // Configure client
     let client = Client::new(host);
 
     match matches.subcommand() {
         ("user", user_sub_matches) => {
             match user_sub_matches.unwrap().subcommand() {
-                ("create", user_create_sub_matches) => println!("create"),
-                ("password", user_password_sub_matches) => println!("password"),
+                ("create", user_create_sub_matches) => {
+                    // Get requested email and password (safe to unwrap because are a required fields)
+                    let user_create_sub_matches = user_create_sub_matches.unwrap();
+                    let auth = Auth {
+                        email: user_create_sub_matches.value_of("email").unwrap().to_string(),
+                        password: user_create_sub_matches.value_of("password").unwrap().to_string()
+                    };
+                    trace!("Parsed new user options: {:?}", auth);
+                    info!("Creating new user");
+                    match client.create_user(&auth).await {
+                        Ok(()) => println!("New user created successfully"),
+                        Err(err) => {
+                            println!("{}", err);
+                            process::exit(0x0100);
+                        }
+                    }
+                },
+                ("password", user_password_sub_matches) => {
+                    // Get requested old and new password (safe to unwrap because are a required fields)
+                    let user_password_sub_matches = user_password_sub_matches.unwrap();
+                    let change = ChangeUserPassword {
+                        current_password: user_password_sub_matches.value_of("old").unwrap().to_string(),
+                        new_password: user_password_sub_matches.value_of("new").unwrap().to_string()
+                    };
+                    trace!("Parsed change password options: {:?}", change);
+                    // Perform auth and get token
+                    let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    info!("Performing password change");
+                    match client.change_user_password(token.access, &change).await {
+                        Ok(()) => println!("Password changed successfully"),
+                        Err(err) => {
+                            println!("{}", err);
+                            process::exit(0x0100);
+                        }
+                    }
+                },
                 _ => unreachable!()
             };
         },
         ("password", password_sub_matches) => {
             match password_sub_matches.unwrap().subcommand() {
-                ("add", password_add_sub_matches) => println!("add"),
-                ("list", password_list_sub_matches) => {
-                    // First auth
-                    let token = match auth(&client, token, matches.value_of("username"), matches.value_of("password")).await {
-                        Ok(token) => token,
+                ("add", password_add_sub_matches) => {
+                    let new_password = parse_password_matches(password_add_sub_matches.unwrap());
+                    trace!("Parsed site options: {:?}", new_password);
+                    // Perform auth and get token
+                    let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    info!("Creating new password");
+                    match client.post_password(token.access, &new_password).await {
+                        Ok(()) => println!("New password created successfully"),
                         Err(err) => {
                             println!("{}", err);
                             process::exit(0x0100);
-                        }
-                    };
-                    // Get the password list
-                    let mut passwords = match client.get_passwords(token.access).await {
-                        Ok(passwords) => {
-                            info!("Password list obtained successfully");
-                            passwords
-                        },
-                        Err(err) => {
-                            println!("{}", err);
-                            process::exit(0x0100);
-                        }
-                    };
-                    info!("Returning password list");
-                    passwords.results.sort_by_key(|k| k.site.clone());
-                    if password_list_sub_matches.unwrap().is_present("long") {
-                        let mut counter = 0;
-                        for password in passwords.results.iter() {
-                            // If list has more than one item print a separator
-                            if counter > 0 {
-                                println!("{}", "- -".repeat(20));
-                            }
-                            print_site(password);
-                            counter += 1;
-                        }
-                    } else {
-                        for password in passwords.results.iter() {
-                            println!("{}", password.site);
                         }
                     }
                 },
-                ("show", password_show_sub_matches) => println!("show"),
-                ("update", password_update_sub_matches) => println!("update"),
+                ("list", password_list_sub_matches) => {
+                    // Get the password list
+                    let mut passwords = get_passwords(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    info!("Returning password list");
+                    // Check if the password list is empty
+                    if passwords.results.len() == 0 {
+                        println!("The password list is empty");
+                    } else {
+                        // Sort passwords alphabetically by site
+                        passwords.results.sort_by_key(|k| k.site.clone());
+                        if password_list_sub_matches.unwrap().is_present("full") {
+                            let mut counter = 0;
+                            for password in passwords.results.iter() {
+                                // If list has more than one item print a separator
+                                if counter > 0 {
+                                    println!("{}", "- -".repeat(20));
+                                }
+                                print_site(password);
+                                counter += 1;
+                            }
+                        } else {
+                            for password in passwords.results.iter() {
+                                println!("{}", password.site);
+                            }
+                        }
+                    }
+                },
+                ("show", password_show_sub_matches) => {
+                    // Get requested password (safe to unwrap because is a required field)
+                    let site = password_show_sub_matches.unwrap().value_of("site").unwrap();
+                    // Get the password list
+                    let passwords = get_passwords(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    debug!("Looking for site {} in password list", site);
+                    match passwords.results.iter().find(|&s| s.site == site) {
+                        Some(password) => {
+                            info!("Returning password settings");
+                            print_site(password);
+                        },
+                        None => println!("Site '{}' not found in password list", site)
+                    };
+                },
+                ("update", password_update_sub_matches) => {
+                    // Get id (safe to unwrap because is a required field)
+                    let id = password_update_sub_matches.unwrap().value_of("id").unwrap().to_string();
+                    trace!("Parsed site ID: {}", id);
+                    let new_password = parse_password_matches(password_update_sub_matches.unwrap());
+                    trace!("Parsed site options: {:?}", new_password);
+                    // Perform auth and get token
+                    let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    info!("Updating password {}", id);
+                    match client.put_password(token.access, id, &new_password).await {
+                        Ok(()) => println!("Password updated successfully"),
+                        Err(err) => {
+                            println!("{}", err);
+                            process::exit(0x0100);
+                        }
+                    }
+                },
                 _ => unreachable!()
             };
         },
-        ("create", user_create_sub_matches) => println!("create"),
         _ => unreachable!()
     };
 }

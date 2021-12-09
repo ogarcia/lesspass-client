@@ -4,8 +4,9 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use log::debug;
+use serde::{Deserialize, Deserializer, Serialize};
 use reqwest::{Response, Url};
 
 #[derive(Serialize, Debug)]
@@ -57,6 +58,7 @@ pub struct Passwords {
 
 #[derive(Deserialize, Eq, Ord, PartialEq, PartialOrd, Debug)]
 pub struct Password {
+    #[serde(deserialize_with = "id_deserializer")]
     pub id: String,
     pub site: String,
     pub login: String,
@@ -67,13 +69,40 @@ pub struct Password {
     pub length: u8,
     pub counter: u32,
     pub version: u8,
+    #[serde(deserialize_with = "date_deserializer")]
     pub created: DateTime<Utc>,
+    #[serde(deserialize_with = "date_deserializer")]
     pub modified: DateTime<Utc>
 }
 
 #[derive(Debug)]
 pub struct Client {
     pub host: Url
+}
+
+fn id_deserializer<'de, D>(deserializer: D) -> Result<String, D::Error> where D: Deserializer<'de>, {
+    // Some server implementations (like Rockpass) store IDs in simple integers instead of strings
+    // This function deserializes unsigned integers or strings
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrInteger {
+        String(String),
+        Integer(u64)
+    }
+    match StringOrInteger::deserialize(deserializer)? {
+        StringOrInteger::String(string) => Ok(string),
+        StringOrInteger::Integer(integer) => Ok(integer.to_string())
+    }
+}
+
+fn date_deserializer<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error> where D: Deserializer<'de>, {
+    // Some server implementations (like Rockpass) store dates in NaiveDateTime
+    // This function deserializes NaiveDateTime and DateTime with TimeZone
+    let s = String::deserialize(deserializer)?;
+    match s.parse::<NaiveDateTime>() {
+        Ok(date) => Ok(Utc.from_utc_datetime(&date)),
+        Err(_) => s.parse::<DateTime<Utc>>().map_err(serde::de::Error::custom)
+    }
 }
 
 impl Client {
@@ -175,7 +204,10 @@ impl Client {
         let url = self.build_url("auth/jwt/create/");
         let body = Auth { email: email, password: password };
         let token: Token = match self.post(&url, None, &body).await?.json().await {
-            Ok(token) => token,
+            Ok(token) => {
+                debug!("New token created successfully");
+                token
+            },
             Err(err) => return Err(format!("Unexpected response, {}", err))
         };
         Ok(token)
@@ -185,7 +217,10 @@ impl Client {
         let url = self.build_url("auth/jwt/refresh/");
         let body = Refresh { refresh: token };
         let token: Token = match self.post(&url, None, &body).await?.json().await {
-            Ok(token) => token,
+            Ok(token) => {
+                debug!("Token refreshed successfully");
+                token
+            },
             Err(err) => return Err(format!("Unexpected response, {}", err))
         };
         Ok(token)
