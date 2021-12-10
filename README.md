@@ -1,5 +1,9 @@
 # lesspass-client
 
+[![Made with Rust](https://forthebadge.com/images/badges/made-with-rust.svg)](https://forthebadge.com)
+[![Gluten Free](https://forthebadge.com/images/badges/gluten-free.svg)](https://forthebadge.com)
+[![It works](https://forthebadge.com/images/badges/it-works-why.svg)](https://forthebadge.com)
+
 A Rust client for [LessPass][lesspass] server API, library and CLI.
 
 [lesspass]: https://github.com/lesspass/lesspass
