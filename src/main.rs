@@ -263,6 +263,12 @@ async fn main() {
                                      .short("l")
                                      .long("length")
                                      .takes_value(true)))
+                    .subcommand(SubCommand::with_name("delete")
+                                .about("delete existing password")
+                                .setting(AppSettings::ArgRequiredElseHelp)
+                                .arg(Arg::with_name("id")
+                                     .help("site id")
+                                     .required(true)))
                     .subcommand(SubCommand::with_name("list")
                                 .about("list all passwords")
                                 .arg(Arg::with_name("full")
@@ -393,6 +399,21 @@ async fn main() {
                     info!("Creating new password");
                     match client.post_password(token.access, &new_password).await {
                         Ok(()) => println!("New password created successfully"),
+                        Err(err) => {
+                            println!("{}", err);
+                            process::exit(0x0100);
+                        }
+                    }
+                },
+                ("delete", password_delete_sub_matches) => {
+                    // Get id (safe to unwrap because is a required field)
+                    let id = password_delete_sub_matches.unwrap().value_of("id").unwrap().to_string();
+                    trace!("Parsed site ID: {}", id);
+                    // Perform auth and get token
+                    let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    info!("Deleting password {}", id);
+                    match client.delete_password(token.access, id).await {
+                        Ok(()) => println!("Password deleted successfully"),
                         Err(err) => {
                             println!("{}", err);
                             process::exit(0x0100);

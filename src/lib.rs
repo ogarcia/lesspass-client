@@ -178,8 +178,8 @@ impl Client {
         let authorization = format!("Bearer {}", token);
         match reqwest::Client::new().delete(url.as_str()).header("Authorization", authorization).send().await {
             Ok(response) => {
-                // Ok response code to all DELETE to LessPass API is 204
-                if response.status() == 204 {
+                // Ok response code to all DELETE to LessPass API is 200 or 204
+                if response.status() == 200 || response.status() == 204 {
                     Ok(response)
                 } else {
                     Err(format!("Error in DELETE request, unexpected status code {}", response.status()))
