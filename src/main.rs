@@ -13,7 +13,7 @@ use env_logger::Builder;
 use log::LevelFilter;
 use reqwest::Url;
 use xdg::BaseDirectories;
-use lesspass_client::{Auth, ChangeUserPassword, NewPassword, Password, Passwords, Token, Client};
+use lesspass_client::{NewPassword, Password, Passwords, Token, Client};
 
 use std::{fs, path, process};
 
@@ -181,6 +181,18 @@ async fn main() {
         .author(crate_authors!())
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .setting(AppSettings::VersionlessSubcommands)
+        .after_help(r#"EXAMPLES:
+    Get the password list specifying the server and without token cached:
+      lesspass-client -s http://localhost:8000 -u user@sample.com -p passwd password list
+
+    Show a password:
+      lesspass-client password show sample.site.com
+
+    Add a new password:
+      lesspass-client password add sample.site.com user@site.com
+
+    Update a existing password (you need the ID from password show command):
+      lesspass-client password update eed5950b-97f2-4ba9-bf09-7784b6c7e5a2 new.url.com new@email.com"#)
         .arg(Arg::with_name("host")
              .short("s")
              .long("server")
@@ -352,14 +364,11 @@ async fn main() {
             match user_sub_matches.unwrap().subcommand() {
                 ("create", user_create_sub_matches) => {
                     // Get requested email and password (safe to unwrap because are a required fields)
-                    let user_create_sub_matches = user_create_sub_matches.unwrap();
-                    let auth = Auth {
-                        email: user_create_sub_matches.value_of("email").unwrap().to_string(),
-                        password: user_create_sub_matches.value_of("password").unwrap().to_string()
-                    };
-                    trace!("Parsed new user options: {:?}", auth);
+                    let email = user_create_sub_matches.unwrap().value_of("email").unwrap().to_string();
+                    let password = user_create_sub_matches.unwrap().value_of("password").unwrap().to_string();
+                    trace!("Parsed new user options: '{}' '{}'", email, password);
                     info!("Creating new user");
-                    match client.create_user(&auth).await {
+                    match client.create_user(email, password).await {
                         Ok(()) => println!("New user created successfully"),
                         Err(err) => {
                             println!("{}", err);
@@ -369,16 +378,13 @@ async fn main() {
                 },
                 ("password", user_password_sub_matches) => {
                     // Get requested old and new password (safe to unwrap because are a required fields)
-                    let user_password_sub_matches = user_password_sub_matches.unwrap();
-                    let change = ChangeUserPassword {
-                        current_password: user_password_sub_matches.value_of("old").unwrap().to_string(),
-                        new_password: user_password_sub_matches.value_of("new").unwrap().to_string()
-                    };
-                    trace!("Parsed change password options: {:?}", change);
+                    let old = user_password_sub_matches.unwrap().value_of("old").unwrap().to_string();
+                    let new = user_password_sub_matches.unwrap().value_of("new").unwrap().to_string();
+                    trace!("Parsed change password options: '{}' '{}'", old, new);
                     // Perform auth and get token
                     let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
                     info!("Performing password change");
-                    match client.change_user_password(token.access, &change).await {
+                    match client.change_user_password(token.access, old, new).await {
                         Ok(()) => println!("Password changed successfully"),
                         Err(err) => {
                             println!("{}", err);

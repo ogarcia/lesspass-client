@@ -4,7 +4,7 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
-use lesspass_client::{Client, Auth, ChangeUserPassword, NewPassword};
+use lesspass_client::{Client, NewPassword};
 use chrono::{TimeZone, Utc};
 use mockito::{Matcher, mock, server_url};
 use reqwest::Url;
@@ -15,17 +15,13 @@ const JH: (&str, &str) = ("content-type", "application/json");
 async fn create_user() {
     let client = Client::new(Url::parse(&server_url()).unwrap());
     let request_body = r#"{"email": "newuser@example.com", "password": "newpassword"}"#;
-    let new_user = Auth {
-        email: "newuser@example.com".to_string(),
-        password: "newpassword".to_string()
-    };
     let _m = mock("POST", "/auth/users/")
         .with_status(201)
         .with_header(JH.0, JH.1)
         .match_body(Matcher::JsonString(request_body.to_string()))
         .create();
     // Ok response
-    let user = client.create_user(&new_user).await.unwrap();
+    let user = client.create_user("newuser@example.com".to_string(), "newpassword".to_string()).await.unwrap();
     assert_eq!((), user);
 }
 
@@ -33,10 +29,6 @@ async fn create_user() {
 async fn change_user_password() {
     let client = Client::new(Url::parse(&server_url()).unwrap());
     let request_body = r#"{"current_password": "current", "new_password": "new"}"#;
-    let new_password = ChangeUserPassword {
-        current_password: "current".to_string(),
-        new_password: "new".to_string()
-    };
     let _m = mock("POST", "/auth/users/set_password/")
         .with_status(201)
         .with_header(JH.0, JH.1)
@@ -44,10 +36,10 @@ async fn change_user_password() {
         .match_body(Matcher::JsonString(request_body.to_string()))
         .create();
     // Ok response
-    let change_password = client.change_user_password("access-token".to_string(), &new_password).await.unwrap();
+    let change_password = client.change_user_password("access-token".to_string(), "current".to_string(), "new".to_string()).await.unwrap();
     assert_eq!((), change_password);
     // Bad response caused by token error
-    let error_in_token = client.change_user_password("bad-token".to_string(), &new_password).await.unwrap_err();
+    let error_in_token = client.change_user_password("bad-token".to_string(), "current".to_string(), "new".to_string()).await.unwrap_err();
     assert_eq!("Error in POST request, unexpected status code 501 Not Implemented", error_in_token);
 }
 

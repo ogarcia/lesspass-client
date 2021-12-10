@@ -4,28 +4,72 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
+///! lesspass-client is a tiny-crate for interacting with [LessPass][lesspass] server API from Rust.
+///!
+///! # Overview
+///!
+///! lesspass-client can interact with several implementations of LessPass server API,
+///! it is specially designed to use with [Rockpass][rockpass] (a small and ultrasecure
+///! Lesspass database server written in Rust) and [official][lesspassapi] ones.
+///!
+///! # Using the Client
+///! ```rust,no_run
+///! use reqwest::Url;
+///! use lesspass_client::Client;
+///!
+///! #[tokio::main]
+///! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///!     // Define a host URL to conect to
+///!     let host = Url::parse("https://api.lesspass.com").unwrap();
+///!
+///!     // Create LessPass API client
+///!     let client = Client::new(host);
+///!
+///!     // Perform an authentication with user and password
+///!     let token = client.create_token("user@example.com".to_string(), "password".to_string()).await?;
+///!
+///!     // Get the password list
+///!     let passwords = client.get_passwords(token.access).await?;
+///!
+///!     // Print the list
+///!     println!("{:?}", passwords);
+///!     Ok(())
+///! }
+///! ```
+///!
+///! You can see a full example in [cli implementation][cli].
+///!
+///! [lesspass]: https://github.com/lesspass/lesspass
+///! [rockpass]: https://github.com/ogarcia/rockpass
+///! [lesspassapi]: https://api.lesspass.com
+///! [cli]: https://github.com/ogarcia/lesspass-client/blob/master/src/main.rs
+
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use log::debug;
 use serde::{Deserialize, Deserializer, Serialize};
 use reqwest::{Response, Url};
 
+/// To perform authentication and create new users
 #[derive(Serialize, Debug)]
 pub struct Auth {
     pub email: String,
     pub password: String
 }
 
+/// To perform the token refresh
 #[derive(Serialize, Debug)]
 pub struct Refresh {
     pub refresh: String
 }
 
+/// To change the password for a user
 #[derive(Serialize, Debug)]
 pub struct ChangeUserPassword {
     pub current_password: String,
     pub new_password: String
 }
 
+/// To create a new password entry
 #[derive(Serialize, Debug)]
 pub struct NewPassword {
     pub site: String,
@@ -39,12 +83,14 @@ pub struct NewPassword {
     pub version: u8
 }
 
+/// To store the authentication response
 #[derive(Deserialize, Debug)]
 pub struct Token {
     pub access: String,
     pub refresh: String
 }
 
+/// To store the password list
 #[derive(Deserialize, Debug)]
 pub struct Passwords {
     pub count: u32,
@@ -56,6 +102,7 @@ pub struct Passwords {
     pub results: Vec<Password>
 }
 
+/// A password item in the password list
 #[derive(Deserialize, Eq, Ord, PartialEq, PartialOrd, Debug)]
 pub struct Password {
     #[serde(deserialize_with = "id_deserializer")]
@@ -75,14 +122,15 @@ pub struct Password {
     pub modified: DateTime<Utc>
 }
 
+/// Client for connecting to LessPass server
 #[derive(Debug)]
 pub struct Client {
     pub host: Url
 }
 
+/// Some server implementations (like Rockpass) store IDs in simple integers instead of strings,
+/// this function deserializes unsigned integers or strings.
 fn id_deserializer<'de, D>(deserializer: D) -> Result<String, D::Error> where D: Deserializer<'de>, {
-    // Some server implementations (like Rockpass) store IDs in simple integers instead of strings
-    // This function deserializes unsigned integers or strings
     #[derive(Deserialize)]
     #[serde(untagged)]
     enum StringOrInteger {
@@ -95,9 +143,9 @@ fn id_deserializer<'de, D>(deserializer: D) -> Result<String, D::Error> where D:
     }
 }
 
+/// Some server implementations (like Rockpass) store dates in NaiveDateTime,
+/// this function deserializes NaiveDateTime and DateTime with TimeZone.
 fn date_deserializer<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error> where D: Deserializer<'de>, {
-    // Some server implementations (like Rockpass) store dates in NaiveDateTime
-    // This function deserializes NaiveDateTime and DateTime with TimeZone
     let s = String::deserialize(deserializer)?;
     match s.parse::<NaiveDateTime>() {
         Ok(date) => Ok(Utc.from_utc_datetime(&date)),
@@ -105,19 +153,31 @@ fn date_deserializer<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
     }
 }
 
+/// Builder interface to Client
+///
+/// Usage:
+/// ```
+/// use reqwest::Url;
+/// use lesspass_client::Client;
+///
+/// let host = Url::parse("https://api.lesspass.com").unwrap();
+/// let lpc = Client::new(host);
+/// ```
 impl Client {
 
+    /// Configure the client itself
     pub fn new(host: Url) -> Client {
         Client { host: host }
     }
 
+    /// Internal helper function to join host with endpoint
     fn build_url(self: &Self, path: &str) -> Url {
         // Calling .unwrap() is safe here because path is always valid
         self.host.join(&path).unwrap()
     }
 
+    /// Internal function to perform authenticated get requests
     async fn get(self: &Self, url: &Url, token: String) -> Result<Response, String> {
-        // Internal function to perform authenticated get requests
         let authorization = format!("Bearer {}", token);
         match reqwest::Client::new().get(url.as_str()).header("Authorization", authorization).send().await {
             Ok(response) => {
@@ -133,8 +193,8 @@ impl Client {
         }
     }
 
+    /// Internal function to perform (un)authenticated post requests
     async fn post<T: Serialize + ?Sized>(self: &Self, url: &Url, token: Option<String>, json: &T) -> Result<Response, String> {
-        // Internal function to perform post requests
         let request = match token {
             Some(token) => {
                 let authorization = format!("Bearer {}", token);
@@ -156,8 +216,8 @@ impl Client {
         }
     }
 
+    /// Internal function to perform authenticated put requests
     async fn put<T: Serialize + ?Sized>(self: &Self, url: &Url, token: String, json: &T) -> Result<Response, String> {
-        // Internal function to perform authenticated put requests
         let authorization = format!("Bearer {}", token);
         match reqwest::Client::new().put(url.as_str()).header("Authorization", authorization).json(&json).send().await {
             Ok(response) => {
@@ -173,8 +233,8 @@ impl Client {
         }
     }
 
+    /// Internal function to perform authenticated delete requests
     async fn delete(self: &Self, url: &Url, token: String) -> Result<Response, String> {
-        // Internal function to perform authenticated delete requests
         let authorization = format!("Bearer {}", token);
         match reqwest::Client::new().delete(url.as_str()).header("Authorization", authorization).send().await {
             Ok(response) => {
@@ -190,16 +250,23 @@ impl Client {
         }
     }
 
-    pub async fn create_user(self: &Self, auth: &Auth) -> Result<(), String> {
+    /// Creates a new user
+    pub async fn create_user(self: &Self, email: String, password: String) -> Result<(), String> {
         let url = self.build_url("auth/users/");
-        self.post(&url, None, &auth).await.map(|_|())
+        let body = Auth { email: email, password: password };
+        self.post(&url, None, &body).await.map(|_|())
     }
 
-    pub async fn change_user_password(self: &Self, token: String, password: &ChangeUserPassword) -> Result<(), String> {
+    /// Changes current user password
+    ///
+    /// Need access token string
+    pub async fn change_user_password(self: &Self, token: String, current_password: String, new_password: String) -> Result<(), String> {
         let url = self.build_url("auth/users/set_password/");
-        self.post(&url, Some(token), &password).await.map(|_|())
+        let body = ChangeUserPassword { current_password: current_password, new_password: new_password };
+        self.post(&url, Some(token), &body).await.map(|_|())
     }
 
+    /// Create a new token (perform initial auth with username and password)
     pub async fn create_token(self: &Self, email: String, password: String) -> Result<Token, String> {
         let url = self.build_url("auth/jwt/create/");
         let body = Auth { email: email, password: password };
@@ -213,6 +280,9 @@ impl Client {
         Ok(token)
     }
 
+    /// Refresh a token
+    ///
+    /// Need refresh token string
     pub async fn refresh_token(self: &Self, token: String) -> Result<Token, String> {
         let url = self.build_url("auth/jwt/refresh/");
         let body = Refresh { refresh: token };
@@ -226,6 +296,9 @@ impl Client {
         Ok(token)
     }
 
+    /// Gets the password list
+    ///
+    /// Need access token string
     pub async fn get_passwords(self: &Self, token: String) -> Result<Passwords, String> {
         let url = self.build_url("passwords/");
         let passwords: Passwords = match self.get(&url, token).await?.json().await {
@@ -235,17 +308,26 @@ impl Client {
         Ok(passwords)
     }
 
+    /// Creates a new password
+    ///
+    /// Need access token string
     pub async fn post_password(self: &Self, token: String, password: &NewPassword) -> Result<(), String> {
         let url = self.build_url("passwords/");
         self.post(&url, Some(token), &password).await.map(|_|())
     }
 
+    /// Updates existing password
+    ///
+    /// Need access token string
     pub async fn put_password(self: &Self, token: String, id: String, password: &NewPassword) -> Result<(), String> {
         let path = format!("passwords/{}/", id);
         let url = self.build_url(&path);
         self.put(&url, token, &password).await.map(|_|())
     }
 
+    /// Deletes existing password
+    ///
+    /// Need access token string
     pub async fn delete_password(self: &Self, token: String, id: String) -> Result<(), String> {
         let path = format!("passwords/{}/", id);
         let url = self.build_url(&path);
