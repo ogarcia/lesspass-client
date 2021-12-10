@@ -4,45 +4,49 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
-///! lesspass-client is a tiny-crate for interacting with [LessPass][lesspass] server API from Rust.
-///!
-///! # Overview
-///!
-///! lesspass-client can interact with several implementations of LessPass server API,
-///! it is specially designed to use with [Rockpass][rockpass] (a small and ultrasecure
-///! Lesspass database server written in Rust) and [official][lesspassapi] ones.
-///!
-///! # Using the Client
-///! ```rust,no_run
-///! use reqwest::Url;
-///! use lesspass_client::Client;
-///!
-///! #[tokio::main]
-///! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///!     // Define a host URL to conect to
-///!     let host = Url::parse("https://api.lesspass.com").unwrap();
-///!
-///!     // Create LessPass API client
-///!     let client = Client::new(host);
-///!
-///!     // Perform an authentication with user and password
-///!     let token = client.create_token("user@example.com".to_string(), "password".to_string()).await?;
-///!
-///!     // Get the password list
-///!     let passwords = client.get_passwords(token.access).await?;
-///!
-///!     // Print the list
-///!     println!("{:?}", passwords);
-///!     Ok(())
-///! }
-///! ```
-///!
-///! You can see a full example in [cli implementation][cli].
-///!
-///! [lesspass]: https://github.com/lesspass/lesspass
-///! [rockpass]: https://github.com/ogarcia/rockpass
-///! [lesspassapi]: https://api.lesspass.com
-///! [cli]: https://github.com/ogarcia/lesspass-client/blob/master/src/main.rs
+//! lesspass-client is a tiny-crate for interacting with [LessPass][lesspass] server API from Rust.
+//!
+//! # Overview
+//!
+//! lesspass-client can interact with several implementations of LessPass server API,
+//! it is specially designed to use with [Rockpass][rockpass] (a small and ultrasecure
+//! Lesspass database server written in Rust) and [official][lesspassapi] ones.
+//!
+//! # Using the Client
+//! ```rust,no_run
+//! use reqwest::Url;
+//! use lesspass_client::Client;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Define a host URL to conect to
+//!     let host = Url::parse("https://api.lesspass.com").unwrap();
+//!
+//!     // Create LessPass API client
+//!     let client = Client::new(host);
+//!
+//!     // Perform an authentication with user and password
+//!     let token = client
+//!         .create_token("user@example.com".to_string(), "password".to_string())
+//!         .await?;
+//!
+//!     // Get the password list
+//!     let passwords = client.get_passwords(token.access).await?;
+//!
+//!     // Print the list
+//!     println!("{:?}", passwords);
+//!     Ok(())
+//! }
+//! ```
+//!
+//! For details, see:
+//! * [Client][Client] for implementation of LessPass server API client.
+//! * [CLI][cli] for a full example of use.
+//!
+//! [lesspass]: https://github.com/lesspass/lesspass
+//! [rockpass]: https://github.com/ogarcia/rockpass
+//! [lesspassapi]: https://api.lesspass.com
+//! [cli]: https://github.com/ogarcia/lesspass-client/blob/master/src/main.rs
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use log::debug;
