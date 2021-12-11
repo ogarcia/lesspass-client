@@ -207,7 +207,7 @@ async fn main() {
         .arg(Arg::with_name("password")
              .short("p")
              .long("password")
-             .env("LESSPASS_PASSWORD")
+             .env("LESSPASS_PASS")
              .help("Password for auth on the LessPass server"))
         .arg(Arg::with_name("verbosity")
              .short("v")
@@ -286,12 +286,20 @@ async fn main() {
                                 .arg(Arg::with_name("full")
                                      .help("get full list (not only sites)")
                                      .short("f")
-                                     .long("full")))
+                                     .long("full"))
+                                .arg(Arg::with_name("id")
+                                     .help("sort password list by id instead of site")
+                                     .short("i")
+                                     .long("id")))
                     .subcommand(SubCommand::with_name("show")
                                 .about("show one password")
                                 .setting(AppSettings::ArgRequiredElseHelp)
+                                .arg(Arg::with_name("id")
+                                     .help("search by id instead of site")
+                                     .short("i")
+                                     .long("id"))
                                 .arg(Arg::with_name("site")
-                                     .help("target website")
+                                     .help("target id or site")
                                      .required(true)))
                     .subcommand(SubCommand::with_name("update")
                                 .about("update existing password")
@@ -434,8 +442,13 @@ async fn main() {
                     if passwords.results.len() == 0 {
                         println!("The password list is empty");
                     } else {
-                        // Sort passwords alphabetically by site
-                        passwords.results.sort_by_key(|k| k.site.clone());
+                        if password_list_sub_matches.unwrap().is_present("id") {
+                            // Sort passwords alphabetically by id
+                            passwords.results.sort();
+                        } else {
+                            // Sort passwords alphabetically by site
+                            passwords.results.sort_by_key(|k| k.site.clone());
+                        }
                         if password_list_sub_matches.unwrap().is_present("full") {
                             let mut counter = 0;
                             for password in passwords.results.iter() {
@@ -459,7 +472,13 @@ async fn main() {
                     // Get the password list
                     let passwords = get_passwords(&client, matches.value_of("username"), matches.value_of("password")).await;
                     debug!("Looking for site {} in password list", site);
-                    match passwords.results.iter().find(|&s| s.site == site) {
+                    // Check if the requested password is an id or a site
+                    let password = if password_show_sub_matches.unwrap().is_present("id") {
+                        passwords.results.iter().find(|&s| s.id == site)
+                    } else {
+                        passwords.results.iter().find(|&s| s.site == site)
+                    };
+                    match password {
                         Some(password) => {
                             info!("Returning password settings");
                             print_site(password);

@@ -58,7 +58,7 @@ FLAGS:
 
 OPTIONS:
     -s, --server <host>          URL of LessPass server [env: LESSPASS_HOST=]  [default: https://api.lesspass.com]
-    -p, --password <password>    Password for auth on the LessPass server [env: LESSPASS_PASSWORD=]
+    -p, --password <password>    Password for auth on the LessPass server [env: LESSPASS_PASS=]
     -u, --user <username>        Username for auth on the LessPass server [env: LESSPASS_USER=]
 
 SUBCOMMANDS:
