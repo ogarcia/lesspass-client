@@ -39,8 +39,8 @@ rustup override set stable
 
 To build lesspass-client simply execute the following commands.
 ```sh
-git clone https://github.com/ogarcia/rlpcli.git
-cd rlpcli
+git clone https://github.com/ogarcia/lesspass-client.git
+cd lesspass-client
 cargo build --release
 ```
 
