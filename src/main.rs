@@ -8,7 +8,7 @@
 extern crate log;
 extern crate clap;
 extern crate xdg;
-use clap::{crate_authors, crate_version, Arg, ArgMatches, App, AppSettings, SubCommand};
+use clap::{command, value_parser, Arg, ArgAction, ArgMatches, Command};
 use env_logger::Builder;
 use log::LevelFilter;
 use reqwest::Url;
@@ -32,29 +32,16 @@ fn print_site(site: &Password) {
 }
 
 fn parse_password_matches(matches: &ArgMatches) -> NewPassword {
-    let lower = matches.is_present("lowercase");
-    let upper = matches.is_present("uppercase");
-    let numbers = matches.is_present("numbers");
-    let symbols = matches.is_present("symbols");
+    let lower = matches.get_flag("lowercase");
+    let upper = matches.get_flag("uppercase");
+    let numbers = matches.get_flag("numbers");
+    let symbols = matches.get_flag("symbols");
     if lower && upper && numbers && symbols {
         println!("Not all character sets can be excluded");
         process::exit(0x0100);
     }
-    // Matches values are strings, pase to integers
-    let length: u8 = match matches.value_of("length").unwrap_or("16").parse() {
-        Ok(length) => length,
-        Err(err) => {
-            println!("Cannot parse length: {}", err);
-            process::exit(0x0100);
-        }
-    };
-    let counter: u32 = match matches.value_of("counter").unwrap_or("1").parse() {
-        Ok(counter) => counter,
-        Err(err) => {
-            println!("Cannot parse counter: {}", err);
-            process::exit(0x0100);
-        }
-    };
+    let length: u8 = *matches.get_one("length").unwrap_or(&16);
+    let counter: u32 = *matches.get_one("counter").unwrap_or(&1);
     // Min password length is 5 and max 35
     if !(5..=35).contains(&length) {
         println!("The minimum password length is 5 and the maximum is 35");
@@ -66,8 +53,8 @@ fn parse_password_matches(matches: &ArgMatches) -> NewPassword {
         process::exit(0x0100);
     }
     NewPassword {
-        site: matches.value_of("site").unwrap().to_string(),
-        login: matches.value_of("login").unwrap().to_string(),
+        site: matches.get_one::<String>("site").unwrap().to_string(),
+        login: matches.get_one::<String>("login").unwrap().to_string(),
         lowercase: !lower,
         uppercase: !upper,
         symbols: !symbols,
@@ -87,7 +74,7 @@ async fn refresh_token(client: &Client, token: String) -> Result<Token, String> 
     client.refresh_token(token).await
 }
 
-async fn auth(client: &Client, user: Option<&str>, pass: Option<&str>) -> Token {
+async fn auth(client: &Client, user: Option<&String>, pass: Option<&String>) -> Token {
     // Try to get token form cache file
     let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).unwrap().place_cache_file("token") {
         Ok(token_cache_file) => {
@@ -157,7 +144,7 @@ async fn auth(client: &Client, user: Option<&str>, pass: Option<&str>) -> Token 
 }
 
 
-async fn get_passwords(client: &Client, user: Option<&str>, pass: Option<&str>) -> Passwords {
+async fn get_passwords(client: &Client, user: Option<&String>, pass: Option<&String>) -> Passwords {
     // First auth to get token
     let token = auth(&client, user, pass).await;
     // Get the password list
@@ -176,11 +163,9 @@ async fn get_passwords(client: &Client, user: Option<&str>, pass: Option<&str>) 
 #[tokio::main]
 async fn main() {
 
-    let matches = App::new(APP_NAME)
-        .version(crate_version!())
-        .author(crate_authors!())
-        .setting(AppSettings::SubcommandRequiredElseHelp)
-        .setting(AppSettings::VersionlessSubcommands)
+    let matches = command!()
+        .subcommand_required(true)
+        .arg_required_else_help(true)
         .after_help(r#"EXAMPLES:
     Get the password list specifying the server and without token cached:
       lesspass-client -s http://localhost:8000 -u user@sample.com -p passwd password list
@@ -193,156 +178,167 @@ async fn main() {
 
     Update a existing password (you need the ID from password show command):
       lesspass-client password update eed5950b-97f2-4ba9-bf09-7784b6c7e5a2 new.url.com new@email.com"#)
-        .arg(Arg::with_name("host")
-             .short("s")
+        .arg(Arg::new("host")
+             .short('s')
              .long("server")
              .env("LESSPASS_HOST")
              .default_value("https://api.lesspass.com")
              .help("URL of LessPass server"))
-        .arg(Arg::with_name("username")
-             .short("u")
+        .arg(Arg::new("username")
+             .short('u')
              .long("user")
              .env("LESSPASS_USER")
              .help("Username for auth on the LessPass server"))
-        .arg(Arg::with_name("password")
-             .short("p")
+        .arg(Arg::new("password")
+             .short('p')
              .long("password")
              .env("LESSPASS_PASS")
              .help("Password for auth on the LessPass server"))
-        .arg(Arg::with_name("verbosity")
-             .short("v")
+        .arg(Arg::new("verbosity")
+             .short('v')
              .long("verbose")
-             .multiple(true)
+             .action(ArgAction::Count)
              .help("Sets the level of verbosity"))
-        .subcommand(SubCommand::with_name("user")
+        .subcommand(Command::new("user")
                     .about("user related commands")
-                    .setting(AppSettings::SubcommandRequiredElseHelp)
-                    .setting(AppSettings::VersionlessSubcommands)
-                    .subcommand(SubCommand::with_name("create")
+                    .subcommand_required(true)
+                    .arg_required_else_help(true)
+                    .subcommand(Command::new("create")
                                 .about("create new user")
-                                .setting(AppSettings::ArgRequiredElseHelp)
-                                .arg(Arg::with_name("email")
+                                .arg_required_else_help(true)
+                                .arg(Arg::new("email")
                                      .help("login email")
                                      .required(true))
-                                .arg(Arg::with_name("password")
+                                .arg(Arg::new("password")
                                      .help("login password")
                                      .required(true)))
-                    .subcommand(SubCommand::with_name("password")
+                    .subcommand(Command::new("password")
                                 .about("change your user password")
-                                .setting(AppSettings::ArgRequiredElseHelp)
-                                .arg(Arg::with_name("old")
+                                .arg_required_else_help(true)
+                                .arg(Arg::new("old")
                                      .help("old password")
                                      .required(true))
-                                .arg(Arg::with_name("new")
+                                .arg(Arg::new("new")
                                      .help("new password")
                                      .required(true))))
-        .subcommand(SubCommand::with_name("password")
+        .subcommand(Command::new("password")
                     .about("password related commands")
-                    .setting(AppSettings::SubcommandRequiredElseHelp)
-                    .setting(AppSettings::VersionlessSubcommands)
-                    .subcommand(SubCommand::with_name("add")
+                    .subcommand_required(true)
+                    .arg_required_else_help(true)
+                    .subcommand(Command::new("add")
                                 .about("add new password")
-                                .setting(AppSettings::ArgRequiredElseHelp)
-                                .arg(Arg::with_name("site")
+                                .arg_required_else_help(true)
+                                .arg(Arg::new("site")
                                      .help("target website")
                                      .required(true))
-                                .arg(Arg::with_name("login")
+                                .arg(Arg::new("login")
                                      .help("site username")
                                      .required(true))
-                                .arg(Arg::with_name("lowercase")
+                                .arg(Arg::new("lowercase")
                                      .help("exclude lowercase characters")
-                                     .short("L")
-                                     .long("no-lower"))
-                                .arg(Arg::with_name("uppercase")
+                                     .short('L')
+                                     .long("no-lower")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("uppercase")
                                      .help("exclude uppercase characters")
-                                     .short("U")
-                                     .long("no-upper"))
-                                .arg(Arg::with_name("numbers")
+                                     .short('U')
+                                     .long("no-upper")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("numbers")
                                      .help("exclude numbers")
-                                     .short("N")
-                                     .long("no-numbers"))
-                                .arg(Arg::with_name("symbols")
+                                     .short('N')
+                                     .long("no-numbers")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("symbols")
                                      .help("exclude symbols")
-                                     .short("S")
-                                     .long("no-symbols"))
-                                .arg(Arg::with_name("counter")
+                                     .short('S')
+                                     .long("no-symbols")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("counter")
                                      .help("password counter [default: 1]")
-                                     .short("c")
+                                     .short('c')
                                      .long("counter")
-                                     .takes_value(true))
-                                .arg(Arg::with_name("length")
+                                     .value_parser(value_parser!(u32)))
+                                .arg(Arg::new("length")
                                      .help("length of the generated password [default: 16]")
-                                     .short("l")
+                                     .short('l')
                                      .long("length")
-                                     .takes_value(true)))
-                    .subcommand(SubCommand::with_name("delete")
+                                     .value_parser(value_parser!(u8))))
+                    .subcommand(Command::new("delete")
                                 .about("delete existing password")
-                                .setting(AppSettings::ArgRequiredElseHelp)
-                                .arg(Arg::with_name("id")
+                                .arg_required_else_help(true)
+                                .arg(Arg::new("id")
                                      .help("site id")
                                      .required(true)))
-                    .subcommand(SubCommand::with_name("list")
+                    .subcommand(Command::new("list")
                                 .about("list all passwords")
-                                .arg(Arg::with_name("full")
+                                .arg(Arg::new("full")
                                      .help("get full list (not only sites)")
-                                     .short("f")
-                                     .long("full"))
-                                .arg(Arg::with_name("id")
+                                     .short('f')
+                                     .long("full")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("id")
                                      .help("sort password list by id instead of site")
-                                     .short("i")
-                                     .long("id")))
-                    .subcommand(SubCommand::with_name("show")
+                                     .short('i')
+                                     .long("id")
+                                     .action(ArgAction::SetTrue)))
+                    .subcommand(Command::new("show")
                                 .about("show one password")
-                                .setting(AppSettings::ArgRequiredElseHelp)
-                                .arg(Arg::with_name("id")
+                                .arg_required_else_help(true)
+                                .arg(Arg::new("id")
                                      .help("search by id instead of site")
-                                     .short("i")
-                                     .long("id"))
-                                .arg(Arg::with_name("site")
+                                     .short('i')
+                                     .long("id")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("site")
                                      .help("target id or site")
                                      .required(true)))
-                    .subcommand(SubCommand::with_name("update")
+                    .subcommand(Command::new("update")
                                 .about("update existing password")
-                                .setting(AppSettings::ArgRequiredElseHelp)
-                                .arg(Arg::with_name("id")
+                                .arg_required_else_help(true)
+                                .arg(Arg::new("id")
                                      .help("site id")
                                      .required(true))
-                                .arg(Arg::with_name("site")
+                                .arg(Arg::new("site")
                                      .help("target website")
                                      .required(true))
-                                .arg(Arg::with_name("login")
+                                .arg(Arg::new("login")
                                      .help("site username")
                                      .required(true))
-                                .arg(Arg::with_name("lowercase")
+                                .arg(Arg::new("lowercase")
                                      .help("exclude lowercase characters")
-                                     .short("L")
-                                     .long("no-lower"))
-                                .arg(Arg::with_name("uppercase")
+                                     .short('L')
+                                     .long("no-lower")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("uppercase")
                                      .help("exclude uppercase characters")
-                                     .short("U")
-                                     .long("no-upper"))
-                                .arg(Arg::with_name("numbers")
+                                     .short('U')
+                                     .long("no-upper")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("numbers")
                                      .help("exclude numbers")
-                                     .short("N")
-                                     .long("no-numbers"))
-                                .arg(Arg::with_name("symbols")
+                                     .short('N')
+                                     .long("no-numbers")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("symbols")
                                      .help("exclude symbols")
-                                     .short("S")
-                                     .long("no-symbols"))
-                                .arg(Arg::with_name("counter")
+                                     .short('S')
+                                     .long("no-symbols")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("counter")
                                      .help("password counter [default: 1]")
-                                     .short("c")
+                                     .short('c')
                                      .long("counter")
-                                     .takes_value(true))
-                                .arg(Arg::with_name("length")
+                                     .value_parser(value_parser!(u32)))
+                                .arg(Arg::new("length")
                                      .help("length of the generated password [default: 16]")
-                                     .short("l")
+                                     .short('l')
                                      .long("length")
-                                     .takes_value(true))))
+                                     .value_parser(value_parser!(u8)))))
         .get_matches();
 
     // Configure loglevel
-    match matches.occurrences_of("verbosity") {
+    match matches.get_count("verbosity") {
         0 => Builder::new().filter_level(LevelFilter::Off).init(),
         1 => Builder::new().filter_level(LevelFilter::Info).init(),
         2 => Builder::new().filter_level(LevelFilter::Debug).init(),
@@ -350,7 +346,7 @@ async fn main() {
     };
 
     // Is safe to unwrap because it have default value
-    let host = matches.value_of("host").unwrap();
+    let host = matches.get_one::<String>("host").unwrap();
 
     info!("Log level {:?}", log::max_level());
     trace!("Using {} as LESSPASS_HOST", host);
@@ -368,12 +364,12 @@ async fn main() {
     let client = Client::new(host);
 
     match matches.subcommand() {
-        ("user", user_sub_matches) => {
-            match user_sub_matches.unwrap().subcommand() {
-                ("create", user_create_sub_matches) => {
+        Some(("user", user_sub_matches)) => {
+            match user_sub_matches.subcommand() {
+                Some(("create", user_create_sub_matches)) => {
                     // Get requested email and password (safe to unwrap because are a required fields)
-                    let email = user_create_sub_matches.unwrap().value_of("email").unwrap().to_string();
-                    let password = user_create_sub_matches.unwrap().value_of("password").unwrap().to_string();
+                    let email = user_create_sub_matches.get_one::<String>("email").unwrap().to_string();
+                    let password = user_create_sub_matches.get_one::<String>("password").unwrap().to_string();
                     trace!("Parsed new user options: '{}' '{}'", email, password);
                     info!("Creating new user");
                     match client.create_user(email, password).await {
@@ -384,13 +380,13 @@ async fn main() {
                         }
                     }
                 },
-                ("password", user_password_sub_matches) => {
+                Some(("password", user_password_sub_matches)) => {
                     // Get requested old and new password (safe to unwrap because are a required fields)
-                    let old = user_password_sub_matches.unwrap().value_of("old").unwrap().to_string();
-                    let new = user_password_sub_matches.unwrap().value_of("new").unwrap().to_string();
+                    let old = user_password_sub_matches.get_one::<String>("old").unwrap().to_string();
+                    let new = user_password_sub_matches.get_one::<String>("new").unwrap().to_string();
                     trace!("Parsed change password options: '{}' '{}'", old, new);
                     // Perform auth and get token
-                    let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Performing password change");
                     match client.change_user_password(token.access, old, new).await {
                         Ok(()) => println!("Password changed successfully"),
@@ -403,13 +399,13 @@ async fn main() {
                 _ => unreachable!()
             };
         },
-        ("password", password_sub_matches) => {
-            match password_sub_matches.unwrap().subcommand() {
-                ("add", password_add_sub_matches) => {
-                    let new_password = parse_password_matches(password_add_sub_matches.unwrap());
+        Some(("password", password_sub_matches)) => {
+            match password_sub_matches.subcommand() {
+                Some(("add", password_add_sub_matches)) => {
+                    let new_password = parse_password_matches(password_add_sub_matches);
                     trace!("Parsed site options: {:?}", new_password);
                     // Perform auth and get token
-                    let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Creating new password");
                     match client.post_password(token.access, &new_password).await {
                         Ok(()) => println!("New password created successfully"),
@@ -419,12 +415,12 @@ async fn main() {
                         }
                     }
                 },
-                ("delete", password_delete_sub_matches) => {
+                Some(("delete", password_delete_sub_matches)) => {
                     // Get id (safe to unwrap because is a required field)
-                    let id = password_delete_sub_matches.unwrap().value_of("id").unwrap().to_string();
+                    let id = password_delete_sub_matches.get_one::<String>("id").unwrap().to_string();
                     trace!("Parsed site ID: {}", id);
                     // Perform auth and get token
-                    let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Deleting password {}", id);
                     match client.delete_password(token.access, id).await {
                         Ok(()) => println!("Password deleted successfully"),
@@ -434,22 +430,22 @@ async fn main() {
                         }
                     }
                 },
-                ("list", password_list_sub_matches) => {
+                Some(("list", password_list_sub_matches)) => {
                     // Get the password list
-                    let mut passwords = get_passwords(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    let mut passwords = get_passwords(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Returning password list");
                     // Check if the password list is empty
                     if passwords.results.len() == 0 {
                         println!("The password list is empty");
                     } else {
-                        if password_list_sub_matches.unwrap().is_present("id") {
+                        if password_list_sub_matches.get_flag("id") {
                             // Sort passwords alphabetically by id
                             passwords.results.sort();
                         } else {
                             // Sort passwords alphabetically by site
                             passwords.results.sort_by_key(|k| k.site.clone());
                         }
-                        if password_list_sub_matches.unwrap().is_present("full") {
+                        if password_list_sub_matches.get_flag("full") {
                             let mut counter = 0;
                             for password in passwords.results.iter() {
                                 // If list has more than one item print a separator
@@ -466,17 +462,17 @@ async fn main() {
                         }
                     }
                 },
-                ("show", password_show_sub_matches) => {
+                Some(("show", password_show_sub_matches)) => {
                     // Get requested password (safe to unwrap because is a required field)
-                    let site = password_show_sub_matches.unwrap().value_of("site").unwrap();
+                    let site = password_show_sub_matches.get_one::<String>("site").unwrap();
                     // Get the password list
-                    let passwords = get_passwords(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    let passwords = get_passwords(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     debug!("Looking for site {} in password list", site);
                     // Check if the requested password is an id or a site
-                    let password = if password_show_sub_matches.unwrap().is_present("id") {
-                        passwords.results.iter().find(|&s| s.id == site)
+                    let password = if password_show_sub_matches.get_flag("id") {
+                        passwords.results.iter().find(|&s| s.id == *site)
                     } else {
-                        passwords.results.iter().find(|&s| s.site == site)
+                        passwords.results.iter().find(|&s| s.site == *site)
                     };
                     match password {
                         Some(password) => {
@@ -486,14 +482,14 @@ async fn main() {
                         None => println!("Site '{}' not found in password list", site)
                     };
                 },
-                ("update", password_update_sub_matches) => {
+                Some(("update", password_update_sub_matches)) => {
                     // Get id (safe to unwrap because is a required field)
-                    let id = password_update_sub_matches.unwrap().value_of("id").unwrap().to_string();
+                    let id = password_update_sub_matches.get_one::<String>("id").unwrap().to_string();
                     trace!("Parsed site ID: {}", id);
-                    let new_password = parse_password_matches(password_update_sub_matches.unwrap());
+                    let new_password = parse_password_matches(password_update_sub_matches);
                     trace!("Parsed site options: {:?}", new_password);
                     // Perform auth and get token
-                    let token = auth(&client, matches.value_of("username"), matches.value_of("password")).await;
+                    let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Updating password {}", id);
                     match client.put_password(token.access, id, &new_password).await {
                         Ok(()) => println!("Password updated successfully"),

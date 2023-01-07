@@ -19,18 +19,18 @@ path = "src/main.rs"
 required-features = ["default"]
 
 [dependencies]
-chrono = { version="0.4", features = ["serde"] }
+chrono = { version="~0.4", features = ["serde"] }
 log = "~0.4"
 reqwest = { version = "~0.11", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "~1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 
-clap = { version = "~2.34", optional = true }
-env_logger = { version = "~0.9", optional = true }
+clap = { version = "~4.0", features = ["cargo", "env"], optional = true }
+env_logger = { version = "~0.10", optional = true }
 xdg = { version = "~2.4", optional = true }
 
 [dev-dependencies]
-mockito = "~0.30"
+mockito = "~0.31"
 
 [features]
 default = ["clap", "env_logger", "xdg"]
