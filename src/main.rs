@@ -213,7 +213,7 @@ async fn main() {
              .short('m')
              .long("master-password")
              .env("LESSPASS_MASTERPASS")
-             .help("Master pasword (only needed to print site passwords)"))
+             .help("Master password (only needed to print site passwords)"))
         .arg(Arg::new("verbosity")
              .short('v')
              .long("verbose")

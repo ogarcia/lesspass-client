@@ -48,36 +48,36 @@ cargo build --release
 
 Main command help.
 ```
-USAGE:
-    lesspass-client [FLAGS] [OPTIONS] <SUBCOMMAND>
+LessPass server API client library and CLI written in Rust
 
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-    -v, --verbose    Sets the level of verbosity
+Usage: lesspass-client [OPTIONS] <COMMAND>
 
-OPTIONS:
-    -s, --server <host>          URL of LessPass server [env: LESSPASS_HOST=]  [default: https://api.lesspass.com]
-    -p, --password <password>    Password for auth on the LessPass server [env: LESSPASS_PASS=]
-    -u, --user <username>        Username for auth on the LessPass server [env: LESSPASS_USER=]
+Commands:
+  user      User related commands
+  password  Password related commands
+  help      Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    help        Prints this message or the help of the given subcommand(s)
-    password    password related commands
-    user        user related commands
+Options:
+  -s, --server <host>                 URL of LessPass server [env: LESSPASS_HOST=] [default: https://api.lesspass.com]
+  -u, --user <username>               Username for auth on the LessPass server [env: LESSPASS_USER=]
+  -p, --password <password>           Password for auth on the LessPass server [env: LESSPASS_PASS=]
+  -m, --master-password <masterpass>  Master password (only needed to print site passwords) [env: LESSPASS_MASTERPASS=]
+  -v, --verbose...                    Sets the level of verbosity
+  -h, --help                          Print help information
+  -V, --version                       Print version information
 
 EXAMPLES:
-    Get the password list specifying the server and without token cached:
-      lesspass-client -s http://localhost:8000 -u user@sample.com -p passwd password list
+  Get the password list specifying the server and without token cached:
+    lesspass-client -s http://localhost:8000 -u user@sample.com -p passwd password list
 
-    Show a password:
-      lesspass-client password show sample.site.com
+  Show a password:
+    lesspass-client password show sample.site.com
 
-    Add a new password:
-      lesspass-client password add sample.site.com user@site.com
+  Add a new password:
+    lesspass-client password add sample.site.com user@site.com
 
-    Update a existing password (you need the ID from password show command):
-      lesspass-client password update eed5950b-97f2-4ba9-bf09-7784b6c7e5a2 new.url.com new@email.com
+  Update a existing password (you need the ID from password show command):
+    lesspass-client password update eed5950b-97f2-4ba9-bf09-7784b6c7e5a2 new.url.com new@email.com
 ```
 
 In first time use you need to pass username and password to perform login.
@@ -93,6 +93,7 @@ environment variables.
 | LESSPASS_HOST | URL of API server (deafult https://api.lesspass.com) |
 | LESSPASS_USER | Username (ex. user@example.com) |
 | LESSPASS_PASS | Password |
+| LESSPASS_MASTERPASS | Master password (only needed to print site passwords) |
 
 Every command an subcommand has its own help, simply pass `-h` or `--help`
 to see it.
