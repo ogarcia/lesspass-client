@@ -21,7 +21,7 @@ Simply download latest release from [releases page][releases].
 #### Installing Rust
 
 lesspass-client build has been tested with current Rust stable release
-version 1.57.0. You can install Rust from your distribution package or use
+version. You can install Rust from your distribution package or use
 [`rustup`](rustup).
 ```
 rustup default stable
