@@ -310,7 +310,7 @@ async fn main() {
   repeated entries because import command does not overwrite any entries only
   creates new ones."#)
                                 .arg(Arg::new("file")
-                                     .help("path to file")
+                                     .help("path to file (use - to import from stdin)")
                                      .required(true)
                                      .value_parser(value_parser!(path::PathBuf))))
                     .subcommand(Command::new("list")
