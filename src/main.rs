@@ -10,6 +10,7 @@ extern crate clap;
 extern crate xdg;
 use clap::{command, value_parser, Arg, ArgAction, ArgMatches, Command};
 use env_logger::Builder;
+use lesspass::{Algorithm, CharacterSet, generate_entropy, generate_salt, render_password};
 use log::LevelFilter;
 use reqwest::Url;
 use xdg::BaseDirectories;
@@ -208,6 +209,11 @@ async fn main() {
              .long("password")
              .env("LESSPASS_PASS")
              .help("Password for auth on the LessPass server"))
+        .arg(Arg::new("masterpass")
+             .short('m')
+             .long("master-password")
+             .env("LESSPASS_MASTERPASS")
+             .help("Master pasword (only needed to print site passwords)"))
         .arg(Arg::new("verbosity")
              .short('v')
              .long("verbose")
@@ -326,6 +332,11 @@ async fn main() {
                                      .help("search by id instead of site")
                                      .short('i')
                                      .long("id")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("password")
+                                     .help("print password instead site options (need master password)")
+                                     .short('p')
+                                     .long("password")
                                      .action(ArgAction::SetTrue))
                                 .arg(Arg::new("site")
                                      .help("target id or site")
@@ -591,8 +602,45 @@ async fn main() {
                     };
                     match password {
                         Some(password) => {
-                            info!("Returning password settings");
-                            print_site(password);
+                            if password_show_sub_matches.get_flag("password") {
+                                match matches.get_one::<String>("masterpass") {
+                                    Some(masterpass) => {
+                                        info!("Returning site password");
+                                        let mut charset = CharacterSet::All;
+                                        if ! password.lowercase {
+                                            trace!("Lowercase characters excluded");
+                                            charset.remove(CharacterSet::Lowercase);
+                                        }
+                                        if ! password.uppercase {
+                                            trace!("Uppercase characters excluded");
+                                            charset.remove(CharacterSet::Uppercase);
+                                        }
+                                        if ! password.symbols {
+                                            trace!("Symbol characters excluded");
+                                            charset.remove(CharacterSet::Symbols);
+                                        }
+                                        if ! password.numbers {
+                                            trace!("Numeric characters excluded");
+                                            charset.remove(CharacterSet::Numbers);
+                                        }
+                                        if charset.is_empty() {
+                                            println!("There is a problem with site settings, all characters have been excluded");
+                                            process::exit(0x0100);
+                                        }
+                                        let salt = generate_salt(&password.site, &password.login, password.counter);
+                                        let entropy = generate_entropy(&masterpass, &salt, Algorithm::SHA256, 100000);
+                                        let password = render_password(&entropy, charset, password.length.into());
+                                        println!("{}", password);
+                                    },
+                                    None => {
+                                        println!("You need to set the master password");
+                                        process::exit(0x0100);
+                                    }
+                                }
+                            } else {
+                                info!("Returning password settings");
+                                print_site(password);
+                            }
                         },
                         None => println!("Site '{}' not found in password list", site)
                     };
