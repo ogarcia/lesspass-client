@@ -5,7 +5,7 @@
 //
 
 use lesspass_client::{Client, NewPassword};
-use chrono::{TimeZone, Utc};
+use chrono::{NaiveDate, Utc};
 use mockito::{Matcher, mock, server_url};
 use reqwest::Url;
 
@@ -152,8 +152,8 @@ async fn get_passwords() {
     assert_eq!(true, passwords.results[0].lowercase);
     assert_eq!("bob.example.com", &passwords.results[1].site);
     assert_eq!(false, passwords.results[1].numbers);
-    assert_eq!(Utc.ymd(2021, 11, 21).and_hms_micro(11, 34, 18, 361454), passwords.results[1].created);
-    assert_eq!(Utc.ymd(2021, 12, 7).and_hms_micro(4, 12, 5, 131415), passwords.results[1].modified);
+    assert_eq!(NaiveDate::from_ymd_opt(2021, 11, 21).unwrap().and_hms_micro_opt(11, 34, 18, 361454).unwrap().and_local_timezone(Utc).unwrap(), passwords.results[1].created);
+    assert_eq!(NaiveDate::from_ymd_opt(2021, 12, 7).unwrap().and_hms_micro_opt(4, 12, 5, 131415).unwrap().and_local_timezone(Utc).unwrap(), passwords.results[1].modified);
     // Bad response caused by token error
     let error_in_token = client.get_passwords("bad-token".to_string()).await.unwrap_err();
     assert_eq!("Error in GET request, unexpected status code 501 Not Implemented", error_in_token);
