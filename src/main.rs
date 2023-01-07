@@ -13,9 +13,9 @@ use env_logger::Builder;
 use log::LevelFilter;
 use reqwest::Url;
 use xdg::BaseDirectories;
-use lesspass_client::{NewPassword, Password, Passwords, Token, Client};
+use lesspass_client::{NewPassword, NewPasswords, Password, Passwords, Token, Client};
 
-use std::{fs, path, process};
+use std::{fs, io, path, process};
 
 const APP_NAME: &str = "lesspass-client";
 
@@ -29,6 +29,20 @@ fn print_site(site: &Password) {
     println!("Numbers: {}", site.numbers);
     println!("Length: {}", site.length);
     println!("Couter: {}", site.counter);
+}
+
+fn export_passwords(passwords: &String, path: &path::PathBuf) {
+    if path.as_os_str() == "-" {
+        println!("{}", passwords);
+    } else {
+        match fs::write(path.as_path(), format!("{}\n", passwords)) {
+            Ok(_) => println!("Exported passwords file stored successfully"),
+            Err(err) => {
+                println!("{}: {}", path.display(), err);
+                process::exit(0x0100);
+            }
+        }
+    }
 }
 
 fn parse_password_matches(matches: &ArgMatches) -> NewPassword {
@@ -167,17 +181,17 @@ async fn main() {
         .subcommand_required(true)
         .arg_required_else_help(true)
         .after_help(r#"EXAMPLES:
-    Get the password list specifying the server and without token cached:
-      lesspass-client -s http://localhost:8000 -u user@sample.com -p passwd password list
+  Get the password list specifying the server and without token cached:
+    lesspass-client -s http://localhost:8000 -u user@sample.com -p passwd password list
 
-    Show a password:
-      lesspass-client password show sample.site.com
+  Show a password:
+    lesspass-client password show sample.site.com
 
-    Add a new password:
-      lesspass-client password add sample.site.com user@site.com
+  Add a new password:
+    lesspass-client password add sample.site.com user@site.com
 
-    Update a existing password (you need the ID from password show command):
-      lesspass-client password update eed5950b-97f2-4ba9-bf09-7784b6c7e5a2 new.url.com new@email.com"#)
+  Update a existing password (you need the ID from password show command):
+    lesspass-client password update eed5950b-97f2-4ba9-bf09-7784b6c7e5a2 new.url.com new@email.com"#)
         .arg(Arg::new("host")
              .short('s')
              .long("server")
@@ -200,11 +214,11 @@ async fn main() {
              .action(ArgAction::Count)
              .help("Sets the level of verbosity"))
         .subcommand(Command::new("user")
-                    .about("user related commands")
+                    .about("User related commands")
                     .subcommand_required(true)
                     .arg_required_else_help(true)
                     .subcommand(Command::new("create")
-                                .about("create new user")
+                                .about("Create new user")
                                 .arg_required_else_help(true)
                                 .arg(Arg::new("email")
                                      .help("login email")
@@ -213,7 +227,7 @@ async fn main() {
                                      .help("login password")
                                      .required(true)))
                     .subcommand(Command::new("password")
-                                .about("change your user password")
+                                .about("Change your user password")
                                 .arg_required_else_help(true)
                                 .arg(Arg::new("old")
                                      .help("old password")
@@ -222,11 +236,11 @@ async fn main() {
                                      .help("new password")
                                      .required(true))))
         .subcommand(Command::new("password")
-                    .about("password related commands")
+                    .about("Password related commands")
                     .subcommand_required(true)
                     .arg_required_else_help(true)
                     .subcommand(Command::new("add")
-                                .about("add new password")
+                                .about("Add new password")
                                 .arg_required_else_help(true)
                                 .arg(Arg::new("site")
                                      .help("target website")
@@ -265,13 +279,36 @@ async fn main() {
                                      .long("length")
                                      .value_parser(value_parser!(u8))))
                     .subcommand(Command::new("delete")
-                                .about("delete existing password")
+                                .about("Delete existing password")
                                 .arg_required_else_help(true)
                                 .arg(Arg::new("id")
                                      .help("site id")
                                      .required(true)))
+                    .subcommand(Command::new("export")
+                                .about("Export all passwords to a plain (unencrypted) JSON file")
+                                .arg_required_else_help(true)
+                                .arg(Arg::new("pretty")
+                                     .help("export in pretty format (readable) rather than compact")
+                                     .short('p')
+                                     .long("pretty")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("file")
+                                     .help("path to file (use - to export to stdout)")
+                                     .required(true)
+                                     .value_parser(value_parser!(path::PathBuf))))
+                    .subcommand(Command::new("import")
+                                .about("Import passwords from exported JSON file")
+                                .arg_required_else_help(true)
+                                .after_help(r#"WARNING:
+  Keep in mind that if you import more than once the same file you will have
+  repeated entries because import command does not overwrite any entries only
+  creates new ones."#)
+                                .arg(Arg::new("file")
+                                     .help("path to file")
+                                     .required(true)
+                                     .value_parser(value_parser!(path::PathBuf))))
                     .subcommand(Command::new("list")
-                                .about("list all passwords")
+                                .about("List all passwords")
                                 .arg(Arg::new("full")
                                      .help("get full list (not only sites)")
                                      .short('f')
@@ -283,7 +320,7 @@ async fn main() {
                                      .long("id")
                                      .action(ArgAction::SetTrue)))
                     .subcommand(Command::new("show")
-                                .about("show one password")
+                                .about("Show one password")
                                 .arg_required_else_help(true)
                                 .arg(Arg::new("id")
                                      .help("search by id instead of site")
@@ -294,7 +331,7 @@ async fn main() {
                                      .help("target id or site")
                                      .required(true)))
                     .subcommand(Command::new("update")
-                                .about("update existing password")
+                                .about("Update existing password")
                                 .arg_required_else_help(true)
                                 .arg(Arg::new("id")
                                      .help("site id")
@@ -426,6 +463,84 @@ async fn main() {
                         Ok(()) => println!("Password deleted successfully"),
                         Err(err) => {
                             println!("{}", err);
+                            process::exit(0x0100);
+                        }
+                    }
+                },
+                Some(("export", password_export_sub_matches)) => {
+                    // Get the file path (safe to unwrap because is a required field)
+                    let path = password_export_sub_matches.get_one::<path::PathBuf>("file").unwrap();
+                    info!("Exporting data to {}", path.display());
+                    // Get the password list
+                    let passwords = get_passwords(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
+                    if password_export_sub_matches.get_flag("pretty") {
+                        match serde_json::to_string_pretty(&passwords) {
+                            Ok(password_pretty_json) => export_passwords(&password_pretty_json, &path),
+                            Err(err) => {
+                                println!("{}", err);
+                                process::exit(0x0100);
+                            }
+                        }
+                    } else {
+                        match serde_json::to_string(&passwords) {
+                            Ok(password_pretty_json) => export_passwords(&password_pretty_json, &path),
+                            Err(err) => {
+                                println!("{}", err);
+                                process::exit(0x0100);
+                            }
+                        }
+                    }
+                },
+                Some(("import", password_import_sub_matches)) => {
+                    // Get the file path (safe to unwrap because is a required field)
+                    let path = password_import_sub_matches.get_one::<path::PathBuf>("file").unwrap();
+                    info!("Importing data from {}", path.display());
+                    // Check if file is stdin
+                    let mut input: Box<dyn io::Read> = if path.as_os_str() == "-" {
+                        Box::new(io::stdin())
+                    } else {
+                        match fs::File::open(&path) {
+                            Ok(file) => Box::new(file),
+                            Err(err) => {
+                                println!("{}: {}", path.display(), err);
+                                process::exit(0x0100);
+                            }
+                        }
+                    };
+                    let mut buffer = String::new();
+                    // Read stdin or file
+                    match input.read_to_string(&mut buffer) {
+                        Ok(_) => {
+                            // Try to deserialize JSON into Passwords struct
+                            let passwords: NewPasswords = match serde_json::from_str(&buffer) {
+                                Ok(passwords) => passwords,
+                                Err(err) => {
+                                    println!("{}", err);
+                                    process::exit(0x0100);
+                                }
+                            };
+                            // Perform auth and get token
+                            let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
+                            // Create new entry for every password
+                            let mut error = false;
+                            for password in passwords.results.iter() {
+                                info!("Importing site {}", &password.site);
+                                match client.post_password(token.access.to_string(), &password).await {
+                                    Ok(()) => debug!("Site {} imported successfully", &password.site),
+                                    Err(err) => {
+                                        error = true;
+                                        println!("Error {} importing site {}", err, &password.site);
+                                    }
+                                }
+                            }
+                            if error {
+                                println!("There have been some errors importing some entries, see above");
+                            } else {
+                                println!("All entries were imported successfully");
+                            }
+                        },
+                        Err(err) => {
+                            println!("{}: {}", path.display(), err);
                             process::exit(0x0100);
                         }
                     }

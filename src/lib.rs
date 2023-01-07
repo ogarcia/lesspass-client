@@ -73,8 +73,14 @@ pub struct ChangeUserPassword {
     pub new_password: String
 }
 
+/// To create a new passwords list
+#[derive(Deserialize, Debug)]
+pub struct NewPasswords {
+    pub results: Vec<NewPassword>
+}
+
 /// To create a new password entry
-#[derive(Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct NewPassword {
     pub site: String,
     pub login: String,
@@ -95,7 +101,7 @@ pub struct Token {
 }
 
 /// To store the password list
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Passwords {
     pub count: u32,
     // API implementation does not use (for now) previous and next
@@ -107,7 +113,7 @@ pub struct Passwords {
 }
 
 /// A password item in the password list
-#[derive(Deserialize, Eq, Ord, PartialEq, PartialOrd, Debug)]
+#[derive(Deserialize, Serialize, Eq, Ord, PartialEq, PartialOrd, Debug)]
 pub struct Password {
     #[serde(deserialize_with = "id_deserializer")]
     pub id: String,
