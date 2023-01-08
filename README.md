@@ -6,7 +6,11 @@
 
 A Rust client for [LessPass][lesspass] server API, library and CLI.
 
+If you are looking for a minimal implementation to only get the values from
+the server see [rlpcli][rlpcli].
+
 [lesspass]: https://github.com/lesspass/lesspass
+[rlpcli]: https://github.com/ogarcia/rlpcli
 
 ## Installation
 
