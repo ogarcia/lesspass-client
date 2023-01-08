@@ -284,6 +284,48 @@ async fn main() {
                                      .short('l')
                                      .long("length")
                                      .value_parser(value_parser!(u8))))
+                    .subcommand(Command::new("build")
+                                .about("Build a password from parameters (need master password)")
+                                .arg_required_else_help(true)
+                                .after_help(r#"WARNING:
+  This command only returns a password from the parameters provided, but
+  does not store anything on the LessPass server."#)
+                                .arg(Arg::new("site")
+                                     .help("target website")
+                                     .required(true))
+                                .arg(Arg::new("login")
+                                     .help("site username")
+                                     .required(true))
+                                .arg(Arg::new("lowercase")
+                                     .help("exclude lowercase characters")
+                                     .short('L')
+                                     .long("no-lower")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("uppercase")
+                                     .help("exclude uppercase characters")
+                                     .short('U')
+                                     .long("no-upper")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("numbers")
+                                     .help("exclude numbers")
+                                     .short('N')
+                                     .long("no-numbers")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("symbols")
+                                     .help("exclude symbols")
+                                     .short('S')
+                                     .long("no-symbols")
+                                     .action(ArgAction::SetTrue))
+                                .arg(Arg::new("counter")
+                                     .help("password counter [default: 1]")
+                                     .short('c')
+                                     .long("counter")
+                                     .value_parser(value_parser!(u32)))
+                                .arg(Arg::new("length")
+                                     .help("length of the generated password [default: 16]")
+                                     .short('l')
+                                     .long("length")
+                                     .value_parser(value_parser!(u8))))
                     .subcommand(Command::new("delete")
                                 .about("Delete existing password")
                                 .arg_required_else_help(true)
@@ -463,6 +505,45 @@ async fn main() {
                         }
                     }
                 },
+                Some(("build", password_add_sub_matches)) => {
+                    let password = parse_password_matches(password_add_sub_matches);
+                    trace!("Parsed site options: {:?}", password);
+                    match matches.get_one::<String>("masterpass") {
+                        Some(masterpass) => {
+                            trace!("Using {} (value is masked) as master password", "*".repeat(masterpass.len()));
+                            info!("Returning site password");
+                            let mut charset = CharacterSet::All;
+                            if ! password.lowercase {
+                                trace!("Lowercase characters excluded");
+                                charset.remove(CharacterSet::Lowercase);
+                            }
+                            if ! password.uppercase {
+                                trace!("Uppercase characters excluded");
+                                charset.remove(CharacterSet::Uppercase);
+                            }
+                            if ! password.symbols {
+                                trace!("Symbol characters excluded");
+                                charset.remove(CharacterSet::Symbols);
+                            }
+                            if ! password.numbers {
+                                trace!("Numeric characters excluded");
+                                charset.remove(CharacterSet::Numbers);
+                            }
+                            if charset.is_empty() {
+                                println!("There is a problem with site settings, all characters have been excluded");
+                                process::exit(0x0100);
+                            }
+                            let salt = generate_salt(&password.site, &password.login, password.counter);
+                            let entropy = generate_entropy(&masterpass, &salt, Algorithm::SHA256, 100000);
+                            let password = render_password(&entropy, charset, password.length.into());
+                            println!("{}", password);
+                        },
+                        None => {
+                            println!("You need to set the master password");
+                            process::exit(0x0100);
+                        }
+                    }
+                },
                 Some(("delete", password_delete_sub_matches)) => {
                     // Get id (safe to unwrap because is a required field)
                     let id = password_delete_sub_matches.get_one::<String>("id").unwrap().to_string();
@@ -605,6 +686,7 @@ async fn main() {
                             if password_show_sub_matches.get_flag("password") {
                                 match matches.get_one::<String>("masterpass") {
                                     Some(masterpass) => {
+                                        trace!("Using {} (value is masked) as master password", "*".repeat(masterpass.len()));
                                         info!("Returning site password");
                                         let mut charset = CharacterSet::All;
                                         if ! password.lowercase {
