@@ -101,3 +101,19 @@ environment variables.
 
 Every command an subcommand has its own help, simply pass `-h` or `--help`
 to see it.
+
+### How to get the API password
+
+By default the API password is not in plain text but it is encrypted with
+LessPass itself as another access password. This prevents the password from
+being sent unencrypted.
+
+The following parameters are used to calculate the password to be sent.
+- Site: `lesspass.com`
+- Login: The email address you use to authenticate.
+- Master password: The password you use to authenticate.
+- Options: Default. This means all options checked, size 16 and counter 1.
+
+For example, if to authenticate against the API server we use as user
+`test@example.com` and as password `123456`, this would generate a password
+`Kd*k5i63iN$^z)?V` that is the one we must use as `LESSPASS_PASS`.
