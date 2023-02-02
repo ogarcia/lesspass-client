@@ -117,3 +117,9 @@ The following parameters are used to calculate the password to be sent.
 For example, if to authenticate against the API server we use as user
 `test@example.com` and as password `123456`, this would generate a password
 `Kd*k5i63iN$^z)?V` that is the one we must use as `LESSPASS_PASS`.
+
+You can do this with lesspass-client itself.
+```sh
+$ lesspass-client -m 123456 password build lesspass.com test@example.com
+Kd*k5i63iN$^z)?V
+```
