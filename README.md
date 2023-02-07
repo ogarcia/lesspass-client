@@ -1,24 +1,34 @@
 # lesspass-client
 
-[![Made with Rust](https://forthebadge.com/images/badges/made-with-rust.svg)](https://forthebadge.com)
-[![Gluten Free](https://forthebadge.com/images/badges/gluten-free.svg)](https://forthebadge.com)
-[![It works](https://forthebadge.com/images/badges/it-works-why.svg)](https://forthebadge.com)
+[![Made with Rust](https://forthebadge.com/images/badges/made-with-rust.svg)](https://www.rust-lang.org)
+[![Gluten Free](https://forthebadge.com/images/badges/gluten-free.svg)](https://en.wikipedia.org/wiki/Gluten-free_diet)
+[![It works](https://forthebadge.com/images/badges/it-works-why.svg)](https://youtu.be/dQw4w9WgXcQ)
 
-A Rust client for [LessPass][lesspass] server API, library and CLI.
+A Rust client for [LessPass][lesspass] API server like [Rockpass][rockpass],
+library and CLI.
 
 If you are looking for a minimal implementation to only get the values from
 the server see [rlpcli][rlpcli].
 
 [lesspass]: https://github.com/lesspass/lesspass
-[rlpcli]: https://github.com/ogarcia/rlpcli
+[rockpass]: https://gitlab.com/ogarcia/rockpass
+[rlpcli]: https://gitlab.com/ogarcia/rlpcli
 
-## Installation
+## Library documentation
+
+The library is published in [crates.io][crate] and its documentation is
+detailed in [docs.rs][docs].
+
+[crate]: https://crates.io/crates/lesspass-client
+[docs]: https://docs.rs/lesspass-client/latest/lesspass_client/
+
+## CLI Installation
 
 ### From binary
 
 Simply download latest release from [releases page][releases].
 
-[releases]: https://github.com/ogarcia/lesspass-client/releases
+[releases]: https://gitlab.com/ogarcia/lesspass-client/-/releases
 
 ### From source
 
@@ -43,10 +53,17 @@ rustup override set stable
 
 To build lesspass-client simply execute the following commands.
 ```sh
-git clone https://github.com/ogarcia/lesspass-client.git
+git clone https://gitlab.com/ogarcia/lesspass-client.git
 cd lesspass-client
 cargo build --release
 ```
+
+### Arch Linux package
+
+lesspass-client is packaged in Arch Linux and can be downloaded from the
+[AUR][aur].
+
+[aur]: https://aur.archlinux.org/packages/lesspass-client
 
 ## Usage
 

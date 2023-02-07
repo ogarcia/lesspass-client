@@ -43,10 +43,10 @@
 //! * [Client][Client] for implementation of LessPass server API client.
 //! * [CLI][cli] for a full example of use.
 //!
-//! [lesspass]: https://github.com/lesspass/lesspass
-//! [rockpass]: https://github.com/ogarcia/rockpass
-//! [lesspassapi]: https://api.lesspass.com
-//! [cli]: https://github.com/ogarcia/lesspass-client/blob/master/src/main.rs
+//! [lesspass]: https://gitlab.com/lesspass/lesspass
+//! [rockpass]: https://gitlab.com/ogarcia/rockpass
+//! [lesspassapi]: https://github.com/lesspass/lesspass/tree/main/containers
+//! [cli]: https://gitlab.com/ogarcia/lesspass-client/-/blob/master/src/main.rs
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use log::debug;

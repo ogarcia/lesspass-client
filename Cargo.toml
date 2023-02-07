@@ -3,11 +3,11 @@ name = "lesspass-client"
 version = "0.4.0"
 authors = ["Óscar García Amor <ogarcia@connectical.com>"]
 edition = "2021"
-description = "LessPass server API client library and CLI written in Rust"
+description = "LessPass API server client library and CLI written in Rust"
 readme = "README.md"
-repository = "https://github.com/ogarcia/lesspass-client"
+repository = "https://gitlab.com/ogarcia/lesspass-client"
 license = "GPL-3.0-only"
-keywords = ["lesspass", "rockpass", "password", "client", "cli"]
+keywords = ["lesspass", "rockpass", "library", "password", "client", "cli"]
 categories = ["command-line-utilities", "web-programming::http-client"]
 
 [lib]

@@ -1,0 +1,86 @@
+default:
+  image: alpine:latest
+
+variables:
+  QUAY_REGISTRY_URL: "quay.io"
+  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/lesspass-client/${CI_COMMIT_TAG}"
+  PACKAGE: lesspass-client-release-${CI_COMMIT_TAG}.tar.xz
+
+stages:
+  - Test
+  - Build
+  - Package
+  - Publish
+  - Release
+
+Test lesspass-client:
+  stage: Test
+  image: rust:buster
+  script:
+    - cargo test
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - target
+
+Build lesspass-client:
+  stage: Build
+  image: rust:buster
+  script:
+    - cargo build --release --locked
+  artifacts:
+    name: lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+    paths:
+      - target/release/lesspass-client
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - target
+
+Package lesspass-client:
+  stage: Package
+  script:
+    - apk -U --no-progress add xz
+    - install -Dm755 "target/release/lesspass-client" "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/lesspass-client"
+    - install -Dm644 "README.md" "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/README.md"
+    - install -Dm644 "LICENSE" "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/LICENSE"
+    - tar cvJf "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}.tar.xz" "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}"
+  artifacts:
+    name: lesspass-client-package-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+    paths:
+      - lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}.tar.xz
+  rules:
+    - if: $CI_COMMIT_TAG == null
+
+Package lesspass-client release:
+  stage: Package
+  script:
+    - apk -U --no-progress add xz
+    - install -Dm755 "target/release/lesspass-client" "lesspass-client-${CI_COMMIT_TAG}/lesspass-client"
+    - install -Dm644 "README.md" "lesspass-client-${CI_COMMIT_TAG}/README.md"
+    - install -Dm644 "LICENSE" "lesspass-client-${CI_COMMIT_TAG}/LICENSE"
+    - tar cvJf ${PACKAGE} "lesspass-client-${CI_COMMIT_TAG}"
+  artifacts:
+    name: lesspass-client-release-package-${CI_COMMIT_TAG}
+    paths:
+      - ${PACKAGE}
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
+
+Publish lesspass-client release:
+  stage: Publish
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE} "${PACKAGE_REGISTRY_URL}/${PACKAGE}"
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
+
+Release:
+  stage: Release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  script: |
+    release-cli create --name "Release ${CI_COMMIT_TAG}" --tag-name ${CI_COMMIT_TAG} \
+      --assets-link "{\"name\":\"${PACKAGE}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE}\"}"
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
