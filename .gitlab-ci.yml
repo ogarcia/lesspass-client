@@ -2,9 +2,10 @@ default:
   image: alpine:latest
 
 variables:
-  QUAY_REGISTRY_URL: "quay.io"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/lesspass-client/${CI_COMMIT_TAG}"
-  PACKAGE: lesspass-client-release-${CI_COMMIT_TAG}.tar.xz
+  ARTIFACTS: lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64
+  PACKAGE_NAME: lesspass-client-${CI_COMMIT_TAG}-linux-amd64.tar.xz
+  PACKAGE_PATH: lesspass-client-${CI_COMMIT_TAG}-linux-amd64
 
 stages:
   - Test
@@ -29,7 +30,7 @@ Build lesspass-client:
   script:
     - cargo build --release --locked
   artifacts:
-    name: lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+    name: ${ARTIFACTS}
     paths:
       - target/release/lesspass-client
   cache:
@@ -40,15 +41,13 @@ Build lesspass-client:
 Package lesspass-client:
   stage: Package
   script:
-    - apk -U --no-progress add xz
-    - install -Dm755 "target/release/lesspass-client" "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/lesspass-client"
-    - install -Dm644 "README.md" "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/README.md"
-    - install -Dm644 "LICENSE" "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/LICENSE"
-    - tar cvJf "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}.tar.xz" "lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}"
+    - install -Dm755 "target/release/lesspass-client" "${ARTIFACTS}/lesspass-client"
+    - install -Dm644 "README.md" "${ARTIFACTS}/README.md"
+    - install -Dm644 "LICENSE" "${ARTIFACTS}/LICENSE"
   artifacts:
-    name: lesspass-client-package-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+    name: ${ARTIFACTS}
     paths:
-      - lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}.tar.xz
+      - ${ARTIFACTS}/
   rules:
     - if: $CI_COMMIT_TAG == null
 
@@ -56,14 +55,14 @@ Package lesspass-client release:
   stage: Package
   script:
     - apk -U --no-progress add xz
-    - install -Dm755 "target/release/lesspass-client" "lesspass-client-${CI_COMMIT_TAG}/lesspass-client"
-    - install -Dm644 "README.md" "lesspass-client-${CI_COMMIT_TAG}/README.md"
-    - install -Dm644 "LICENSE" "lesspass-client-${CI_COMMIT_TAG}/LICENSE"
-    - tar cvJf ${PACKAGE} "lesspass-client-${CI_COMMIT_TAG}"
+    - install -Dm755 "target/release/lesspass-client" "${PACKAGE_PATH}/lesspass-client"
+    - install -Dm644 "README.md" "${PACKAGE_PATH}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH}/LICENSE"
+    - tar cvJf "${PACKAGE_NAME}" "${PACKAGE_PATH}"
   artifacts:
-    name: lesspass-client-release-package-${CI_COMMIT_TAG}
+    name: ${ARTIFACTS}
     paths:
-      - ${PACKAGE}
+      - ${PACKAGE_NAME}
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
 
@@ -72,7 +71,7 @@ Publish lesspass-client release:
   image: curlimages/curl:latest
   script:
     - |
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE} "${PACKAGE_REGISTRY_URL}/${PACKAGE}"
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME}"
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
 
@@ -81,6 +80,6 @@ Release:
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   script: |
     release-cli create --name "Release ${CI_COMMIT_TAG}" --tag-name ${CI_COMMIT_TAG} \
-      --assets-link "{\"name\":\"${PACKAGE}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE}\"}"
+      --assets-link "{\"name\":\"${PACKAGE_NAME}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME}\"}"
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"

@@ -101,10 +101,11 @@ EXAMPLES:
     lesspass-client password update eed5950b-97f2-4ba9-bf09-7784b6c7e5a2 new.url.com new@email.com
 ```
 
-In first time use you need to pass username and password to perform login.
-After first run, lesspass-client stores the login token in your
-`XDG_CACHE_HOME` directory and you can run commands without the need to pass
-username and password again.
+In first time use you need to pass username and password to perform login
+(see the following section to learn how to obtain the password). After first
+run, lesspass-client stores the login token in your `XDG_CACHE_HOME`
+directory and you can run commands without the need to pass username and
+password again.
 
 To pass configuration values you can use the CLI options or following
 environment variables.
@@ -117,7 +118,10 @@ environment variables.
 | LESSPASS_MASTERPASS | Master password (only needed to print site passwords) |
 
 Every command an subcommand has its own help, simply pass `-h` or `--help`
-to see it.
+to see it. You can see some examples of use in the [Rockpass
+documentation][rpdoc].
+
+[rpdoc]: https://gitlab.com/ogarcia/rockpass#example-of-use-with-lesspass-client
 
 ### How to get the API password
 
