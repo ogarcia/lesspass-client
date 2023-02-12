@@ -286,6 +286,7 @@ async fn main() {
                                      .value_parser(value_parser!(u8))))
                     .subcommand(Command::new("build")
                                 .about("Build a password from parameters (need master password)")
+                                .visible_alias("generate")
                                 .arg_required_else_help(true)
                                 .after_help(r#"WARNING:
   This command only returns a password from the parameters provided, but
@@ -369,6 +370,7 @@ async fn main() {
                                      .action(ArgAction::SetTrue)))
                     .subcommand(Command::new("show")
                                 .about("Show one password")
+                                .visible_alias("get")
                                 .arg_required_else_help(true)
                                 .arg(Arg::new("id")
                                      .help("search by id instead of site")

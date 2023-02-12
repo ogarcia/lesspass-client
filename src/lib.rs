@@ -53,6 +53,12 @@ use log::debug;
 use serde::{Deserialize, Deserializer, Serialize};
 use reqwest::{Response, Url};
 
+const USER_AGENT: &str = concat!(
+    env!("CARGO_PKG_NAME"),
+    "/",
+    env!("CARGO_PKG_VERSION"),
+);
+
 /// To perform authentication and create new users
 #[derive(Serialize, Debug)]
 pub struct Auth {
@@ -135,7 +141,8 @@ pub struct Password {
 /// Client for connecting to LessPass server
 #[derive(Debug)]
 pub struct Client {
-    pub host: Url
+    pub host: Url,
+    pub client: reqwest::Client
 }
 
 /// Some server implementations (like Rockpass) store IDs in simple integers instead of strings,
@@ -177,19 +184,26 @@ impl Client {
 
     /// Configure the client itself
     pub fn new(host: Url) -> Client {
-        Client { host: host }
+        Client {
+            host,
+            client: reqwest::Client::builder()
+                .connection_verbose(true)
+                .user_agent(USER_AGENT)
+                .build()
+                .expect("Client::new()")
+        }
     }
 
     /// Internal helper function to join host with endpoint
-    fn build_url(self: &Self, path: &str) -> Url {
+    fn build_url(&self, path: &str) -> Url {
         // Calling .unwrap() is safe here because path is always valid
         self.host.join(&path).unwrap()
     }
 
     /// Internal function to perform authenticated get requests
-    async fn get(self: &Self, url: &Url, token: String) -> Result<Response, String> {
+    async fn get(&self, url: &Url, token: String) -> Result<Response, String> {
         let authorization = format!("Bearer {}", token);
-        match reqwest::Client::new().get(url.as_str()).header("Authorization", authorization).send().await {
+        match self.client.get(url.as_str()).header("Authorization", authorization).send().await {
             Ok(response) => {
                 // Ok response code to all GET to LessPass API is 200
                 if response.status() == 200 {
@@ -204,13 +218,13 @@ impl Client {
     }
 
     /// Internal function to perform (un)authenticated post requests
-    async fn post<T: Serialize + ?Sized>(self: &Self, url: &Url, token: Option<String>, json: &T) -> Result<Response, String> {
+    async fn post<T: Serialize + ?Sized>(&self, url: &Url, token: Option<String>, json: &T) -> Result<Response, String> {
         let request = match token {
             Some(token) => {
                 let authorization = format!("Bearer {}", token);
-                reqwest::Client::new().post(url.as_str()).header("Authorization", authorization).json(&json).send().await
+                self.client.post(url.as_str()).header("Authorization", authorization).json(&json).send().await
             },
-            None => reqwest::Client::new().post(url.as_str()).json(&json).send().await
+            None => self.client.post(url.as_str()).json(&json).send().await
         };
         match request {
             Ok(response) => {
@@ -227,9 +241,9 @@ impl Client {
     }
 
     /// Internal function to perform authenticated put requests
-    async fn put<T: Serialize + ?Sized>(self: &Self, url: &Url, token: String, json: &T) -> Result<Response, String> {
+    async fn put<T: Serialize + ?Sized>(&self, url: &Url, token: String, json: &T) -> Result<Response, String> {
         let authorization = format!("Bearer {}", token);
-        match reqwest::Client::new().put(url.as_str()).header("Authorization", authorization).json(&json).send().await {
+        match self.client.put(url.as_str()).header("Authorization", authorization).json(&json).send().await {
             Ok(response) => {
                 // Ok response code to all PUT to LessPass API is 200 or 201
                 if response.status() == 200 || response.status() == 201 {
@@ -244,9 +258,9 @@ impl Client {
     }
 
     /// Internal function to perform authenticated delete requests
-    async fn delete(self: &Self, url: &Url, token: String) -> Result<Response, String> {
+    async fn delete(&self, url: &Url, token: String) -> Result<Response, String> {
         let authorization = format!("Bearer {}", token);
-        match reqwest::Client::new().delete(url.as_str()).header("Authorization", authorization).send().await {
+        match self.client.delete(url.as_str()).header("Authorization", authorization).send().await {
             Ok(response) => {
                 // Ok response code to all DELETE to LessPass API is 200 or 204
                 if response.status() == 200 || response.status() == 204 {
@@ -261,7 +275,7 @@ impl Client {
     }
 
     /// Creates a new user
-    pub async fn create_user(self: &Self, email: String, password: String) -> Result<(), String> {
+    pub async fn create_user(&self, email: String, password: String) -> Result<(), String> {
         let url = self.build_url("auth/users/");
         let body = Auth { email: email, password: password };
         self.post(&url, None, &body).await.map(|_|())
@@ -270,14 +284,14 @@ impl Client {
     /// Changes current user password
     ///
     /// Need access token string
-    pub async fn change_user_password(self: &Self, token: String, current_password: String, new_password: String) -> Result<(), String> {
+    pub async fn change_user_password(&self, token: String, current_password: String, new_password: String) -> Result<(), String> {
         let url = self.build_url("auth/users/set_password/");
         let body = ChangeUserPassword { current_password: current_password, new_password: new_password };
         self.post(&url, Some(token), &body).await.map(|_|())
     }
 
     /// Create a new token (perform initial auth with username and password)
-    pub async fn create_token(self: &Self, email: String, password: String) -> Result<Token, String> {
+    pub async fn create_token(&self, email: String, password: String) -> Result<Token, String> {
         let url = self.build_url("auth/jwt/create/");
         let body = Auth { email: email, password: password };
         let token: Token = match self.post(&url, None, &body).await?.json().await {
@@ -293,7 +307,7 @@ impl Client {
     /// Refresh a token
     ///
     /// Need refresh token string
-    pub async fn refresh_token(self: &Self, token: String) -> Result<Token, String> {
+    pub async fn refresh_token(&self, token: String) -> Result<Token, String> {
         let url = self.build_url("auth/jwt/refresh/");
         let body = Refresh { refresh: token };
         let token: Token = match self.post(&url, None, &body).await?.json().await {
@@ -309,7 +323,7 @@ impl Client {
     /// Gets the password list
     ///
     /// Need access token string
-    pub async fn get_passwords(self: &Self, token: String) -> Result<Passwords, String> {
+    pub async fn get_passwords(&self, token: String) -> Result<Passwords, String> {
         let url = self.build_url("passwords/");
         let passwords: Passwords = match self.get(&url, token).await?.json().await {
             Ok(passwords) => passwords,
@@ -321,7 +335,7 @@ impl Client {
     /// Creates a new password
     ///
     /// Need access token string
-    pub async fn post_password(self: &Self, token: String, password: &NewPassword) -> Result<(), String> {
+    pub async fn post_password(&self, token: String, password: &NewPassword) -> Result<(), String> {
         let url = self.build_url("passwords/");
         self.post(&url, Some(token), &password).await.map(|_|())
     }
@@ -329,7 +343,7 @@ impl Client {
     /// Updates existing password
     ///
     /// Need access token string
-    pub async fn put_password(self: &Self, token: String, id: String, password: &NewPassword) -> Result<(), String> {
+    pub async fn put_password(&self, token: String, id: String, password: &NewPassword) -> Result<(), String> {
         let path = format!("passwords/{}/", id);
         let url = self.build_url(&path);
         self.put(&url, token, &password).await.map(|_|())
@@ -338,7 +352,7 @@ impl Client {
     /// Deletes existing password
     ///
     /// Need access token string
-    pub async fn delete_password(self: &Self, token: String, id: String) -> Result<(), String> {
+    pub async fn delete_password(&self, token: String, id: String) -> Result<(), String> {
         let path = format!("passwords/{}/", id);
         let url = self.build_url(&path);
         self.delete(&url, token).await.map(|_|())
