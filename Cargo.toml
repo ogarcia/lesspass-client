@@ -7,8 +7,8 @@ description = "LessPass API server client library and CLI written in Rust"
 readme = "README.md"
 repository = "https://gitlab.com/ogarcia/lesspass-client"
 license = "GPL-3.0-only"
-keywords = ["lesspass", "rockpass", "library", "password", "client", "cli"]
-categories = ["command-line-utilities", "web-programming::http-client"]
+keywords = ["lesspass", "library", "password", "client", "cli"]
+categories = ["api-bindings", "command-line-utilities", "web-programming::http-client"]
 
 [lib]
 path = "src/lib.rs"
