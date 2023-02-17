@@ -6,20 +6,22 @@
 
 use lesspass_client::{Client, NewPassword};
 use chrono::{NaiveDate, Utc};
-use mockito::{Matcher, mock, server_url};
+use mockito::{Matcher, Server};
 use reqwest::Url;
 
 const JH: (&str, &str) = ("content-type", "application/json");
 
 #[tokio::test]
 async fn create_user() {
-    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
     let request_body = r#"{"email": "newuser@example.com", "password": "newpassword"}"#;
-    let _m = mock("POST", "/auth/users/")
+    let _m = server.mock("POST", "/auth/users/")
         .with_status(201)
         .with_header(JH.0, JH.1)
         .match_body(Matcher::JsonString(request_body.to_string()))
-        .create();
+        .create_async()
+        .await;
     // Ok response
     let user = client.create_user("newuser@example.com".to_string(), "newpassword".to_string()).await.unwrap();
     assert_eq!((), user);
@@ -27,14 +29,16 @@ async fn create_user() {
 
 #[tokio::test]
 async fn change_user_password() {
-    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
     let request_body = r#"{"current_password": "current", "new_password": "new"}"#;
-    let _m = mock("POST", "/auth/users/set_password/")
+    let _m = server.mock("POST", "/auth/users/set_password/")
         .with_status(201)
         .with_header(JH.0, JH.1)
         .match_header("authorization", "Bearer access-token")
         .match_body(Matcher::JsonString(request_body.to_string()))
-        .create();
+        .create_async()
+        .await;
     // Ok response
     let change_password = client.change_user_password("access-token".to_string(), "current".to_string(), "new".to_string()).await.unwrap();
     assert_eq!((), change_password);
@@ -45,15 +49,17 @@ async fn change_user_password() {
 
 #[tokio::test]
 async fn create_token() {
-    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
     let request_body = r#"{"email": "user@example.com", "password": "password"}"#;
     let response_body = r#"{"access": "access-token", "refresh": "refresh-token"}"#;
-    let _m = mock("POST", "/auth/jwt/create/")
+    let _m = server.mock("POST", "/auth/jwt/create/")
         .with_status(201)
         .with_header(JH.0, JH.1)
         .match_body(Matcher::JsonString(request_body.to_string()))
         .with_body(response_body)
-        .create();
+        .create_async()
+        .await;
     // Ok response
     let token = client.create_token("user@example.com".to_string(), "password".to_string()).await.unwrap();
     assert_eq!("access-token", &token.access);
@@ -61,11 +67,12 @@ async fn create_token() {
     // Bad response caused by auth error
     let error_token = client.create_token("bad".to_string(), "bad".to_string()).await.unwrap_err();
     assert_eq!("Error in POST request, unexpected status code 501 Not Implemented", error_token);
-    let _m = mock("POST", "/auth/jwt/create/")
+    let _m = server.mock("POST", "/auth/jwt/create/")
         .with_status(201)
         .with_header(JH.0, JH.1)
         .with_body("unexpected")
-        .create();
+        .create_async()
+        .await;
     // Bad response caused by unexpected json body
     let error_body = client.create_token("bad".to_string(), "bad".to_string()).await.unwrap_err();
     assert_eq!("Unexpected response, error decoding response body: expected value at line 1 column 1", error_body);
@@ -73,15 +80,17 @@ async fn create_token() {
 
 #[tokio::test]
 async fn refresh_token() {
-    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
     let request_body = r#"{"refresh": "refresh-token"}"#;
     let response_body = r#"{"access": "new-access-token", "refresh": "new-refresh-token"}"#;
-    let _m = mock("POST", "/auth/jwt/refresh/")
+    let _m = server.mock("POST", "/auth/jwt/refresh/")
         .with_status(201)
         .with_header(JH.0, JH.1)
         .match_body(Matcher::JsonString(request_body.to_string()))
         .with_body(response_body)
-        .create();
+        .create_async()
+        .await;
     // Ok response
     let token = client.refresh_token("refresh-token".to_string()).await.unwrap();
     assert_eq!("new-access-token", &token.access);
@@ -89,11 +98,12 @@ async fn refresh_token() {
     // Bad response caused by auth error
     let error_token = client.refresh_token("bad-token".to_string()).await.unwrap_err();
     assert_eq!("Error in POST request, unexpected status code 501 Not Implemented", error_token);
-    let _m = mock("POST", "/auth/jwt/refresh/")
+    let _m = server.mock("POST", "/auth/jwt/refresh/")
         .with_status(201)
         .with_header(JH.0, JH.1)
         .with_body("unexpected")
-        .create();
+        .create_async()
+        .await;
     // Bad response caused by unexpected json body
     let error_body = client.refresh_token("bad-token".to_string()).await.unwrap_err();
     assert_eq!("Unexpected response, error decoding response body: expected value at line 1 column 1", error_body);
@@ -101,7 +111,8 @@ async fn refresh_token() {
 
 #[tokio::test]
 async fn get_passwords() {
-    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
     let response_body = r#"
 {
   "count": 2,
@@ -139,12 +150,13 @@ async fn get_passwords() {
   ]
 }
     "#;
-    let _m = mock("GET", "/passwords/")
+    let _m = server.mock("GET", "/passwords/")
         .with_status(200)
         .with_header(JH.0, JH.1)
         .match_header("authorization", "Bearer access-token")
         .with_body(response_body)
-        .create();
+        .create_async()
+        .await;
     // Ok response
     let passwords = client.get_passwords("access-token".to_string()).await.unwrap();
     assert_eq!(2, passwords.count);
@@ -161,7 +173,8 @@ async fn get_passwords() {
 
 #[tokio::test]
 async fn post_password() {
-    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
     let request_body = r#"
 {
   "login": "newuser@example.com",
@@ -186,12 +199,13 @@ async fn post_password() {
         counter: 5,
         version: 2
     };
-    let _m = mock("POST", "/passwords/")
+    let _m = server.mock("POST", "/passwords/")
         .with_status(201)
         .with_header(JH.0, JH.1)
         .match_header("authorization", "Bearer access-token")
         .match_body(Matcher::JsonString(request_body.to_string()))
-        .create();
+        .create_async()
+        .await;
     // Ok Response
     let post_password = client.post_password("access-token".to_string(), &password).await.unwrap();
     assert_eq!((), post_password);
@@ -202,7 +216,8 @@ async fn post_password() {
 
 #[tokio::test]
 async fn put_password() {
-    let client = Client::new(Url::parse(&server_url()).unwrap());
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
     let request_body = r#"
 {
   "login": "updateuser@example.com",
@@ -227,12 +242,13 @@ async fn put_password() {
         counter: 1,
         version: 2
     };
-    let _m = mock("PUT", "/passwords/ce2835da-9047-43eb-a107-bad4f01d22a0/")
+    let _m = server.mock("PUT", "/passwords/ce2835da-9047-43eb-a107-bad4f01d22a0/")
         .with_status(200)
         .with_header(JH.0, JH.1)
         .match_header("authorization", "Bearer access-token")
         .match_body(Matcher::JsonString(request_body.to_string()))
-        .create();
+        .create_async()
+        .await;
     // Ok Response
     let put_password = client.put_password("access-token".to_string(), "ce2835da-9047-43eb-a107-bad4f01d22a0".to_string(), &password).await.unwrap();
     assert_eq!((), put_password);
@@ -246,12 +262,14 @@ async fn put_password() {
 
 #[tokio::test]
 async fn delete_password() {
-    let client = Client::new(Url::parse(&server_url()).unwrap());
-    let _m = mock("DELETE", "/passwords/1c461df9-11eb-4bf1-976b-1c49d5598b8f/")
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
+    let _m = server.mock("DELETE", "/passwords/1c461df9-11eb-4bf1-976b-1c49d5598b8f/")
         .with_status(204)
         .with_header(JH.0, JH.1)
         .match_header("authorization", "Bearer access-token")
-        .create();
+        .create_async()
+        .await;
     // Ok Response
     let delete_password = client.delete_password("access-token".to_string(), "1c461df9-11eb-4bf1-976b-1c49d5598b8f".to_string()).await.unwrap();
     assert_eq!((), delete_password);
