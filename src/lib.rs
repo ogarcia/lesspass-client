@@ -72,6 +72,12 @@ pub struct Refresh {
     pub refresh: String
 }
 
+/// To delete user
+#[derive(Serialize, Debug)]
+pub struct UserPassword {
+    pub current_password: String
+}
+
 /// To change the password for a user
 #[derive(Serialize, Debug)]
 pub struct ChangeUserPassword {
@@ -265,10 +271,27 @@ impl Client {
         }
     }
 
-    /// Internal function to perform authenticated delete requests
-    async fn delete(&self, url: &Url, token: String) -> Result<Response, String> {
+    /// Internal function to perform authenticated delete requests with empty body
+    async fn empty_delete(&self, url: &Url, token: String) -> Result<Response, String> {
         let authorization = format!("Bearer {}", token);
         match self.client.delete(url.as_str()).header("Authorization", authorization).send().await {
+            Ok(response) => {
+                // Ok response code to all DELETE to LessPass API is 200 or 204
+                if response.status() == 200 || response.status() == 204 {
+                    Ok(response)
+                } else {
+                    Err(format!("Error in DELETE request, unexpected status code {}", response.status()))
+                }
+            },
+            // Cannot reach server by any reason
+            Err(_) => Err(format!("Error making DELETE request to {}", url))
+        }
+    }
+
+    /// Internal function to perform authenticated delete requests
+    async fn delete<T: Serialize + ?Sized>(&self, url: &Url, token: String, json: &T) -> Result<Response, String> {
+        let authorization = format!("Bearer {}", token);
+        match self.client.delete(url.as_str()).header("Authorization", authorization).json(&json).send().await {
             Ok(response) => {
                 // Ok response code to all DELETE to LessPass API is 200 or 204
                 if response.status() == 200 || response.status() == 204 {
@@ -299,6 +322,15 @@ impl Client {
             Err(err) => return Err(format!("Unexpected response, {}", err))
         };
         Ok(user)
+    }
+
+    /// Deletes current user
+    ///
+    /// Need access token string
+    pub async fn delete_user(&self, token: String, current_password: String) -> Result<(), String> {
+        let url = self.build_url("auth/users/me/");
+        let body = UserPassword { current_password: current_password };
+        self.delete(&url, token, &body).await.map(|_|())
     }
 
     /// Changes current user password
@@ -375,7 +407,7 @@ impl Client {
     pub async fn delete_password(&self, token: String, id: String) -> Result<(), String> {
         let path = format!("passwords/{}/", id);
         let url = self.build_url(&path);
-        self.delete(&url, token).await.map(|_|())
+        self.empty_delete(&url, token).await.map(|_|())
     }
 
 }
