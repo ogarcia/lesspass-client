@@ -3,66 +3,122 @@ default:
 
 variables:
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/lesspass-client/${CI_COMMIT_TAG}"
-  ARTIFACTS: lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64
-  PACKAGE_NAME: lesspass-client-${CI_COMMIT_TAG}-linux-amd64.tar.xz
-  PACKAGE_PATH: lesspass-client-${CI_COMMIT_TAG}-linux-amd64
+  ARTIFACTS_AMD64: lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64
+  ARTIFACTS_ARM64: lesspass-client-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-arm64
+  PACKAGE_NAME_AMD64: lesspass-client-${CI_COMMIT_TAG}-linux-amd64.tar.xz
+  PACKAGE_PATH_AMD64: lesspass-client-${CI_COMMIT_TAG}-linux-amd64
+  PACKAGE_NAME_ARM64: lesspass-client-${CI_COMMIT_TAG}-linux-arm64.tar.xz
+  PACKAGE_PATH_ARM64: lesspass-client-${CI_COMMIT_TAG}-linux-arm64
 
 stages:
   - Test
   - Build
+  - Archive
   - Package
   - Publish
   - Release
 
-Test lesspass-client:
+Test AMD64:
   stage: Test
   image: rust:buster
   script:
     - cargo test
   cache:
-    key: ${CI_COMMIT_REF_SLUG}
+    key: ${CI_COMMIT_REF_SLUG}-amd64-glibc
     paths:
       - target
 
-Build lesspass-client:
+Build AMD64:
   stage: Build
   image: rust:buster
   script:
     - cargo build --release --locked
   artifacts:
-    name: ${ARTIFACTS}
+    name: ${ARTIFACTS_AMD64}
     paths:
       - target/release/lesspass-client
   cache:
-    key: ${CI_COMMIT_REF_SLUG}
+    key: ${CI_COMMIT_REF_SLUG}-amd64
     paths:
       - target
 
-Package lesspass-client:
-  stage: Package
+Build ARM64:
+  stage: Build
+  image: rust:buster
   script:
-    - install -Dm755 "target/release/lesspass-client" "${ARTIFACTS}/lesspass-client"
-    - install -Dm644 "README.md" "${ARTIFACTS}/README.md"
-    - install -Dm644 "LICENSE" "${ARTIFACTS}/LICENSE"
+    - cargo build --release --locked
   artifacts:
-    name: ${ARTIFACTS}
+    name: ${ARTIFACTS_ARM64}
     paths:
-      - ${ARTIFACTS}/
+      - target/release/lesspass-client
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-arm64
+    paths:
+      - target
+  tags:
+    - arm64
+
+Archive AMD64:
+  stage: Archive
+  script:
+    - install -Dm755 "target/release/lesspass-client" "${ARTIFACTS_AMD64}/lesspass-client"
+    - install -Dm644 "README.md" "${ARTIFACTS_AMD64}/README.md"
+    - install -Dm644 "LICENSE" "${ARTIFACTS_AMD64}/LICENSE"
+  artifacts:
+    name: ${ARTIFACTS_AMD64}
+    paths:
+      - ${ARTIFACTS_AMD64}/
+  needs:
+    - Build AMD64
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
 
-Package lesspass-client release:
+Archive ARM64:
+  stage: Archive
+  script:
+    - install -Dm755 "target/release/lesspass-client" "${ARTIFACTS_ARM64}/lesspass-client"
+    - install -Dm644 "README.md" "${ARTIFACTS_ARM64}/README.md"
+    - install -Dm644 "LICENSE" "${ARTIFACTS_ARM64}/LICENSE"
+  artifacts:
+    name: ${ARTIFACTS_ARM64}
+    paths:
+      - ${ARTIFACTS_ARM64}/
+  needs:
+    - Build ARM64
+  rules:
+    - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
+
+Package AMD64:
   stage: Package
   script:
     - apk -U --no-progress add xz
-    - install -Dm755 "target/release/lesspass-client" "${PACKAGE_PATH}/lesspass-client"
-    - install -Dm644 "README.md" "${PACKAGE_PATH}/README.md"
-    - install -Dm644 "LICENSE" "${PACKAGE_PATH}/LICENSE"
-    - tar cvJf "${PACKAGE_NAME}" "${PACKAGE_PATH}"
+    - install -Dm755 "target/release/lesspass-client" "${PACKAGE_PATH_AMD64}/lesspass-client"
+    - install -Dm644 "README.md" "${PACKAGE_PATH_AMD64}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH_AMD64}/LICENSE"
+    - tar cvJf "${PACKAGE_NAME_AMD64}" "${PACKAGE_PATH_AMD64}"
   artifacts:
-    name: ${ARTIFACTS}
+    name: ${ARTIFACTS_AMD64}
     paths:
-      - ${PACKAGE_NAME}
+      - ${PACKAGE_NAME_AMD64}
+  needs:
+    - Build AMD64
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
+
+Package ARM64:
+  stage: Package
+  script:
+    - apk -U --no-progress add xz
+    - install -Dm755 "target/release/lesspass-client" "${PACKAGE_PATH_ARM64}/lesspass-client"
+    - install -Dm644 "README.md" "${PACKAGE_PATH_ARM64}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH_ARM64}/LICENSE"
+    - tar cvJf "${PACKAGE_NAME_ARM64}" "${PACKAGE_PATH_ARM64}"
+  artifacts:
+    name: ${ARTIFACTS_ARM64}
+    paths:
+      - ${PACKAGE_NAME_ARM64}
+  needs:
+    - Build ARM64
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
 
@@ -71,7 +127,9 @@ Publish lesspass-client release:
   image: curlimages/curl:latest
   script:
     - |
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME}"
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_AMD64} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64}"
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_ARM64} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_ARM64}"
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
 
@@ -80,6 +138,7 @@ Release:
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   script: |
     release-cli create --name "Release ${CI_COMMIT_TAG}" --tag-name ${CI_COMMIT_TAG} \
-      --assets-link "{\"name\":\"${PACKAGE_NAME}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME}\"}"
+      --assets-link "{\"name\":\"${PACKAGE_NAME_AMD64}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64}\"}" \
+      --assets-link "{\"name\":\"${PACKAGE_NAME_ARM64}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_ARM64}\"}"
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43285042"
