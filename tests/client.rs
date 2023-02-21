@@ -28,6 +28,27 @@ async fn create_user() {
 }
 
 #[tokio::test]
+async fn get_user() {
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
+    let response_body = r#"{"id":1, "email": "newuser@example.com"}"#;
+    let _m = server.mock("GET", "/auth/users/me/")
+        .with_status(200)
+        .with_header(JH.0, JH.1)
+        .match_header("authorization", "Bearer access-token")
+        .with_body(response_body)
+        .create_async()
+        .await;
+    // Ok response
+    let user = client.get_user("access-token".to_string()).await.unwrap();
+    assert_eq!("1", user.id);
+    assert_eq!("newuser@example.com", user.email);
+    // Bad response caused by token error
+    let error_in_token = client.get_user("bad-token".to_string()).await.unwrap_err();
+    assert_eq!("Error in GET request, unexpected status code 501 Not Implemented", error_in_token);
+}
+
+#[tokio::test]
 async fn change_user_password() {
     let mut server = Server::new_async().await;
     let client = Client::new(Url::parse(&server.url()).unwrap());

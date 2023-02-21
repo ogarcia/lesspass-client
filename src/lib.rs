@@ -106,6 +106,14 @@ pub struct Token {
     pub refresh: String
 }
 
+/// To store the user info
+#[derive(Deserialize, Debug)]
+pub struct User {
+    #[serde(deserialize_with = "id_deserializer")]
+    pub id: String,
+    pub email: String
+}
+
 /// To store the password list
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Passwords {
@@ -279,6 +287,18 @@ impl Client {
         let url = self.build_url("auth/users/");
         let body = Auth { email: email, password: password };
         self.post(&url, None, &body).await.map(|_|())
+    }
+
+    /// Gets current user info
+    ///
+    /// Need access token string
+    pub async fn get_user(&self, token: String) -> Result<User, String> {
+        let url = self.build_url("auth/users/me/");
+        let user: User = match self.get(&url, token).await?.json().await {
+            Ok(user) => user,
+            Err(err) => return Err(format!("Unexpected response, {}", err))
+        };
+        Ok(user)
     }
 
     /// Changes current user password

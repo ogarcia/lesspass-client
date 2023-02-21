@@ -1,6 +1,6 @@
 [package]
 name = "lesspass-client"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Óscar García Amor <ogarcia@connectical.com>"]
 edition = "2021"
 description = "LessPass API server client library and CLI written in Rust"

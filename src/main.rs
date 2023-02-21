@@ -14,11 +14,16 @@ use lesspass::{Algorithm, CharacterSet, generate_entropy, generate_salt, render_
 use log::LevelFilter;
 use reqwest::Url;
 use xdg::BaseDirectories;
-use lesspass_client::{NewPassword, NewPasswords, Password, Passwords, Token, Client};
+use lesspass_client::{NewPassword, NewPasswords, Password, Passwords, Token, User, Client};
 
 use std::{fs, io, path, process};
 
 const APP_NAME: &str = "lesspass-client";
+
+fn print_user(user: &User) {
+    println!("ID: {}", user.id);
+    println!("Mail: {}", user.email);
+}
 
 fn print_site(site: &Password) {
     println!("ID: {}", site.id);
@@ -240,7 +245,10 @@ async fn main() {
                                      .required(true))
                                 .arg(Arg::new("new")
                                      .help("new password")
-                                     .required(true))))
+                                     .required(true)))
+                    .subcommand(Command::new("show")
+                                .about("Show user info")
+                                .visible_alias("get")))
         .subcommand(Command::new("password")
                     .about("Password related commands")
                     .subcommand_required(true)
@@ -482,6 +490,18 @@ async fn main() {
                     info!("Performing password change");
                     match client.change_user_password(token.access, old, new).await {
                         Ok(()) => println!("Password changed successfully"),
+                        Err(err) => {
+                            println!("{}", err);
+                            process::exit(0x0100);
+                        }
+                    }
+                },
+                Some(("show", _)) => {
+                    // Perform auth and get token
+                    let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
+                    info!("Returning user info");
+                    match client.get_user(token.access).await {
+                        Ok(user) => print_user(&user),
                         Err(err) => {
                             println!("{}", err);
                             process::exit(0x0100);
