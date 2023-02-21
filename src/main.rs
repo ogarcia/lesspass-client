@@ -237,6 +237,12 @@ async fn main() {
                                 .arg(Arg::new("password")
                                      .help("login password")
                                      .required(true)))
+                    .subcommand(Command::new("delete")
+                                .about("Delete current user")
+                                .arg_required_else_help(true)
+                                .arg(Arg::new("password")
+                                     .help("login password")
+                                     .required(true)))
                     .subcommand(Command::new("password")
                                 .about("Change your user password")
                                 .arg_required_else_help(true)
@@ -247,7 +253,7 @@ async fn main() {
                                      .help("new password")
                                      .required(true)))
                     .subcommand(Command::new("show")
-                                .about("Show user info")
+                                .about("Show current user info")
                                 .visible_alias("get")))
         .subcommand(Command::new("password")
                     .about("Password related commands")
@@ -480,6 +486,21 @@ async fn main() {
                         }
                     }
                 },
+                Some(("delete", user_delete_sub_matches)) => {
+                    // Get requested password (safe to unwrap because are a required field)
+                    let password = user_delete_sub_matches.get_one::<String>("password").unwrap().to_string();
+                    trace!("Parsed delete user option: '{}'", password);
+                    // Perform auth and get token
+                    let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
+                    info!("Deleting current user");
+                    match client.delete_user(token.access, password).await {
+                        Ok(()) => println!("Current user deleted successfully"),
+                        Err(err) => {
+                            println!("{}", err);
+                            process::exit(0x0100);
+                        }
+                    }
+                },
                 Some(("password", user_password_sub_matches)) => {
                     // Get requested old and new password (safe to unwrap because are a required fields)
                     let old = user_password_sub_matches.get_one::<String>("old").unwrap().to_string();
@@ -499,7 +520,7 @@ async fn main() {
                 Some(("show", _)) => {
                     // Perform auth and get token
                     let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
-                    info!("Returning user info");
+                    info!("Returning current user info");
                     match client.get_user(token.access).await {
                         Ok(user) => print_user(&user),
                         Err(err) => {

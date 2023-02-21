@@ -49,6 +49,26 @@ async fn get_user() {
 }
 
 #[tokio::test]
+async fn delete_user() {
+    let mut server = Server::new_async().await;
+    let client = Client::new(Url::parse(&server.url()).unwrap());
+    let request_body = r#"{"current_password": "current"}"#;
+    let _m = server.mock("DELETE", "/auth/users/me/")
+        .with_status(200)
+        .with_header(JH.0, JH.1)
+        .match_header("authorization", "Bearer access-token")
+        .match_body(Matcher::JsonString(request_body.to_string()))
+        .create_async()
+        .await;
+    // Ok response
+    let delete_user = client.delete_user("access-token".to_string(), "current".to_string()).await.unwrap();
+    assert_eq!((), delete_user);
+    // Bad response caused by token error
+    let error_in_token = client.delete_user("bad-token".to_string(), "current".to_string()).await.unwrap_err();
+    assert_eq!("Error in DELETE request, unexpected status code 501 Not Implemented", error_in_token);
+}
+
+#[tokio::test]
 async fn change_user_password() {
     let mut server = Server::new_async().await;
     let client = Client::new(Url::parse(&server.url()).unwrap());
