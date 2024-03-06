@@ -156,7 +156,7 @@ async fn get_passwords() {
     let client = Client::new(Url::parse(&server.url()).unwrap());
     let response_body = r#"
 {
-  "count": 2,
+  "count": 3,
   "next": null,
   "previous": null,
   "results": [
@@ -187,6 +187,20 @@ async fn get_passwords() {
       "version": 2,
       "created": "2021-11-21T11:34:18.361454Z",
       "modified": "2021-12-07T04:12:05.131415Z"
+    },
+    {
+      "id": "10",
+      "login": "user@example.com",
+      "site": "charlie.example.com",
+      "lowercase": false,
+      "uppercase": true,
+      "symbols": true,
+      "numbers": false,
+      "counter": 1,
+      "length": 8,
+      "version": 2,
+      "created": "2023-05-10T12:05:36",
+      "modified": "2023-06-02T17:33:54"
     }
   ]
 }
@@ -200,13 +214,15 @@ async fn get_passwords() {
         .await;
     // Ok response
     let passwords = client.get_passwords("access-token".to_string()).await.unwrap();
-    assert_eq!(2, passwords.count);
+    assert_eq!(3, passwords.count);
     assert_eq!("e1a7e83c-9014-4585-95f5-4595160afe99", &passwords.results[0].id);
+    assert_eq!("10", &passwords.results[2].id);
     assert_eq!(true, passwords.results[0].lowercase);
     assert_eq!("bob.example.com", &passwords.results[1].site);
     assert_eq!(false, passwords.results[1].numbers);
     assert_eq!(NaiveDate::from_ymd_opt(2021, 11, 21).unwrap().and_hms_micro_opt(11, 34, 18, 361454).unwrap().and_local_timezone(Utc).unwrap(), passwords.results[1].created);
     assert_eq!(NaiveDate::from_ymd_opt(2021, 12, 7).unwrap().and_hms_micro_opt(4, 12, 5, 131415).unwrap().and_local_timezone(Utc).unwrap(), passwords.results[1].modified);
+    assert_eq!(NaiveDate::from_ymd_opt(2023, 06, 2).unwrap().and_hms_micro_opt(17, 33, 54, 0).unwrap().and_local_timezone(Utc).unwrap(), passwords.results[2].modified);
     // Bad response caused by token error
     let error_in_token = client.get_passwords("bad-token".to_string()).await.unwrap_err();
     assert_eq!("Error in GET request, unexpected status code 501 Not Implemented", error_in_token);
