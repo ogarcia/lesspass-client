@@ -25,7 +25,7 @@ jobs:
           install -Dm644 "LICENSE" "lesspass-client-${GITHUB_REF##*/}-${GITHUB_SHA}-linux-amd64/LICENSE"
           echo "version=${GITHUB_REF##*/}-${GITHUB_SHA}-linux-amd64" >> $GITHUB_OUTPUT
       - name: Archive current compilation
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "lesspass-client-${{ steps.package-current.outputs.version }}"
           path: "lesspass-client-${{ steps.package-current.outputs.version }}/"
@@ -39,7 +39,7 @@ jobs:
           tar cvJf "lesspass-client-${GITHUB_REF##*/}-linux-amd64.tar.xz" "lesspass-client-${GITHUB_REF##*/}-linux-amd64"
           echo "version=${GITHUB_REF##*/}-linux-amd64" >> $GITHUB_OUTPUT
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
         with:
           files: "lesspass-client-${{ steps.package.outputs.version }}.tar.xz"

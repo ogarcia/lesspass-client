@@ -116,7 +116,7 @@ async fn create_token() {
         .await;
     // Bad response caused by unexpected json body
     let error_body = client.create_token("bad".to_string(), "bad".to_string()).await.unwrap_err();
-    assert_eq!("Unexpected response, error decoding response body: expected value at line 1 column 1", error_body);
+    assert_eq!("Unexpected response, error decoding response body", error_body);
 }
 
 #[tokio::test]
@@ -147,7 +147,7 @@ async fn refresh_token() {
         .await;
     // Bad response caused by unexpected json body
     let error_body = client.refresh_token("bad-token".to_string()).await.unwrap_err();
-    assert_eq!("Unexpected response, error decoding response body: expected value at line 1 column 1", error_body);
+    assert_eq!("Unexpected response, error decoding response body", error_body);
 }
 
 #[tokio::test]
