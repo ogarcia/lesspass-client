@@ -19,7 +19,7 @@ path = "src/main.rs"
 required-features = ["default"]
 
 [dependencies]
-chrono = { version="~0.4", features = ["serde"] }
+chrono = { version="~0.4.38", features = ["serde"] }
 log = "~0.4"
 reqwest = { version = "~0.12", features = ["json"] }
 serde = { version = "~1.0", features = ["derive"] }
