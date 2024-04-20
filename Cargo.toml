@@ -21,7 +21,7 @@ required-features = ["default"]
 [dependencies]
 chrono = { version="~0.4", features = ["serde"] }
 log = "~0.4"
-reqwest = { version = "~0.12", features = ["json"] }
+reqwest = { version = "~0.12.4", features = ["json"] }
 serde = { version = "~1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 
