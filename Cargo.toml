@@ -32,7 +32,7 @@ serde_json = { version = "~1.0", optional = true }
 xdg = { version = "~2.5", optional = true }
 
 [dev-dependencies]
-mockito = "~1.4"
+mockito = "~1.6.0"
 
 [features]
 default = ["clap", "env_logger", "lesspass", "serde_json", "xdg"]
