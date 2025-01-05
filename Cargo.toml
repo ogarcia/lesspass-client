@@ -1,6 +1,6 @@
 [package]
 name = "lesspass-client"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Óscar García Amor <ogarcia@connectical.com>"]
 edition = "2021"
 description = "LessPass API server client library and CLI written in Rust"
@@ -32,7 +32,7 @@ serde_json = { version = "~1.0", optional = true }
 xdg = { version = "~2.5", optional = true }
 
 [dev-dependencies]
-mockito = "~1.4"
+mockito = "~1.6"
 
 [features]
 default = ["clap", "env_logger", "lesspass", "serde_json", "xdg"]
