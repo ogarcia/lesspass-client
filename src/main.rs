@@ -689,7 +689,8 @@ async fn main() {
                     if passwords.results.len() == 0 {
                         println!("The password list is empty");
                     } else {
-                        if password_list_sub_matches.get_flag("id") {
+                        let id_flag = password_list_sub_matches.get_flag("id");
+                        if id_flag {
                             // Sort passwords alphabetically by id
                             passwords.results.sort();
                         } else {
@@ -708,7 +709,11 @@ async fn main() {
                             }
                         } else {
                             for password in passwords.results.iter() {
-                                println!("{}", password.site);
+                                if id_flag {
+                                    println!("{}: {}", password.id, password.site);
+                                } else {
+                                    println!("{}", password.site);
+                                }
                             }
                         }
                     }
