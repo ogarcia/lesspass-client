@@ -133,9 +133,8 @@ pub struct Passwords {
 }
 
 /// A password item in the password list
-#[derive(Deserialize, Serialize, Eq, Ord, PartialEq, PartialOrd, Debug)]
+#[derive(Serialize, Eq, Ord, PartialEq, PartialOrd, Debug)]
 pub struct Password {
-    #[serde(deserialize_with = "id_deserializer")]
     pub id: String,
     pub site: String,
     pub login: String,
@@ -146,10 +145,39 @@ pub struct Password {
     pub length: u8,
     pub counter: u32,
     pub version: u8,
-    #[serde(deserialize_with = "date_deserializer")]
     pub created: DateTime<Utc>,
-    #[serde(deserialize_with = "date_deserializer")]
     pub modified: DateTime<Utc>
+}
+
+/// The numbers field is deprecated and has been replaced by digits so depending on the
+/// implementation the response may contain the first, the second or even both. We deserialize to
+/// an intermediate structure with both fields and return the final structure with only the digits
+/// field (which takes precedence over numbers).
+impl<'de> Deserialize<'de> for Password {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de>, {
+        #[derive(Deserialize)]
+        struct RawPassword {
+            #[serde(deserialize_with = "id_deserializer")]
+            id: String,
+            site: String,
+            login: String,
+            lowercase: bool,
+            uppercase: bool,
+            symbols: bool,
+            digits: Option<bool>,
+            numbers: Option<bool>,
+            length: u8,
+            counter: u32,
+            version: u8,
+            #[serde(deserialize_with = "date_deserializer")]
+            created: DateTime<Utc>,
+            #[serde(deserialize_with = "date_deserializer")]
+            modified: DateTime<Utc>
+        }
+        let RawPassword {id, site, login, lowercase, uppercase, symbols, digits, numbers, length, counter, version, created, modified} = RawPassword::deserialize(deserializer)?;
+        let digits = digits.or(numbers).ok_or(serde::de::Error::missing_field("digits or numbers"))?;
+        Ok(Password {id, site, login, lowercase, uppercase, symbols, numbers: digits, length, counter, version, created, modified})
+    }
 }
 
 /// Client for connecting to LessPass server
