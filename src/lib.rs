@@ -1,6 +1,6 @@
 //
 // lesspass-client
-// Copyright (C) 2021-2023 Óscar García Amor <ogarcia@connectical.com>
+// Copyright (C) 2021-2025 Óscar García Amor <ogarcia@connectical.com>
 // Distributed under terms of the GNU GPLv3 license.
 //
 
@@ -99,7 +99,7 @@ pub struct NewPassword {
     pub lowercase: bool,
     pub uppercase: bool,
     pub symbols: bool,
-    pub numbers: bool,
+    pub digits: bool,
     pub length: u8,
     pub counter: u32,
     pub version: u8
@@ -141,7 +141,7 @@ pub struct Password {
     pub lowercase: bool,
     pub uppercase: bool,
     pub symbols: bool,
-    pub numbers: bool,
+    pub digits: bool,
     pub length: u8,
     pub counter: u32,
     pub version: u8,
@@ -176,7 +176,7 @@ impl<'de> Deserialize<'de> for Password {
         }
         let RawPassword {id, site, login, lowercase, uppercase, symbols, digits, numbers, length, counter, version, created, modified} = RawPassword::deserialize(deserializer)?;
         let digits = digits.or(numbers).ok_or(serde::de::Error::missing_field("digits or numbers"))?;
-        Ok(Password {id, site, login, lowercase, uppercase, symbols, numbers: digits, length, counter, version, created, modified})
+        Ok(Password {id, site, login, lowercase, uppercase, symbols, digits, length, counter, version, created, modified})
     }
 }
 

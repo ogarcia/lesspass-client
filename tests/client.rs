@@ -1,6 +1,6 @@
 //
 // client.rs
-// Copyright (C) 2021-2023 Óscar García Amor <ogarcia@connectical.com>
+// Copyright (C) 2021-2025 Óscar García Amor <ogarcia@connectical.com>
 // Distributed under terms of the GNU GPLv3 license.
 //
 
@@ -220,7 +220,7 @@ async fn get_passwords() {
     assert_eq!("10", &passwords.results[2].id);
     assert_eq!(true, passwords.results[0].lowercase);
     assert_eq!("bob.example.com", &passwords.results[1].site);
-    assert_eq!(false, passwords.results[1].numbers);
+    assert_eq!(false, passwords.results[1].digits);
     assert_eq!(NaiveDate::from_ymd_opt(2021, 11, 21).unwrap().and_hms_micro_opt(11, 34, 18, 361454).unwrap().and_local_timezone(Utc).unwrap(), passwords.results[1].created);
     assert_eq!(NaiveDate::from_ymd_opt(2021, 12, 7).unwrap().and_hms_micro_opt(4, 12, 5, 131415).unwrap().and_local_timezone(Utc).unwrap(), passwords.results[1].modified);
     assert_eq!(NaiveDate::from_ymd_opt(2023, 06, 2).unwrap().and_hms_micro_opt(17, 33, 54, 0).unwrap().and_local_timezone(Utc).unwrap(), passwords.results[2].modified);
@@ -239,7 +239,7 @@ async fn post_password() {
   "site": "new.example.com",
   "uppercase": true,
   "lowercase": true,
-  "numbers": false,
+  "digits": false,
   "symbols": true,
   "length": 18,
   "counter": 5,
@@ -252,7 +252,7 @@ async fn post_password() {
         lowercase: true,
         uppercase: true,
         symbols: true,
-        numbers: false,
+        digits: false,
         length: 18,
         counter: 5,
         version: 2
@@ -282,7 +282,7 @@ async fn put_password() {
   "site": "update.example.com",
   "uppercase": true,
   "lowercase": true,
-  "numbers": false,
+  "digits": false,
   "symbols": false,
   "length": 22,
   "counter": 1,
@@ -295,7 +295,7 @@ async fn put_password() {
         lowercase: true,
         uppercase: true,
         symbols: false,
-        numbers: false,
+        digits: false,
         length: 22,
         counter: 1,
         version: 2

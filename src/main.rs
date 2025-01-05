@@ -1,6 +1,6 @@
 //
 // lesspass-client
-// Copyright (C) 2021-2023 Óscar García Amor <ogarcia@connectical.com>
+// Copyright (C) 2021-2025 Óscar García Amor <ogarcia@connectical.com>
 // Distributed under terms of the GNU GPLv3 license.
 //
 
@@ -32,7 +32,7 @@ fn print_site(site: &Password) {
     println!("Lowercase: {}", site.lowercase);
     println!("Uppercase: {}", site.uppercase);
     println!("Symbols: {}", site.symbols);
-    println!("Numbers: {}", site.numbers);
+    println!("Digits: {}", site.digits);
     println!("Length: {}", site.length);
     println!("Couter: {}", site.counter);
 }
@@ -54,9 +54,9 @@ fn export_passwords(passwords: &String, path: &path::PathBuf) {
 fn parse_password_matches(matches: &ArgMatches) -> NewPassword {
     let lower = matches.get_flag("lowercase");
     let upper = matches.get_flag("uppercase");
-    let numbers = matches.get_flag("numbers");
+    let digits = matches.get_flag("digits");
     let symbols = matches.get_flag("symbols");
-    if lower && upper && numbers && symbols {
+    if lower && upper && digits && symbols {
         println!("Not all character sets can be excluded");
         process::exit(0x0100);
     }
@@ -78,7 +78,7 @@ fn parse_password_matches(matches: &ArgMatches) -> NewPassword {
         lowercase: !lower,
         uppercase: !upper,
         symbols: !symbols,
-        numbers: !numbers,
+        digits: !digits,
         length: length,
         counter: counter,
         version: 2
@@ -278,10 +278,10 @@ async fn main() {
                                      .short('U')
                                      .long("no-upper")
                                      .action(ArgAction::SetTrue))
-                                .arg(Arg::new("numbers")
-                                     .help("exclude numbers")
-                                     .short('N')
-                                     .long("no-numbers")
+                                .arg(Arg::new("digits")
+                                     .help("exclude digits")
+                                     .short('D')
+                                     .long("no-digits")
                                      .action(ArgAction::SetTrue))
                                 .arg(Arg::new("symbols")
                                      .help("exclude symbols")
@@ -321,10 +321,10 @@ async fn main() {
                                      .short('U')
                                      .long("no-upper")
                                      .action(ArgAction::SetTrue))
-                                .arg(Arg::new("numbers")
-                                     .help("exclude numbers")
-                                     .short('N')
-                                     .long("no-numbers")
+                                .arg(Arg::new("digits")
+                                     .help("exclude digits")
+                                     .short('D')
+                                     .long("no-digits")
                                      .action(ArgAction::SetTrue))
                                 .arg(Arg::new("symbols")
                                      .help("exclude symbols")
@@ -421,10 +421,10 @@ async fn main() {
                                      .short('U')
                                      .long("no-upper")
                                      .action(ArgAction::SetTrue))
-                                .arg(Arg::new("numbers")
-                                     .help("exclude numbers")
-                                     .short('N')
-                                     .long("no-numbers")
+                                .arg(Arg::new("digits")
+                                     .help("exclude digits")
+                                     .short('D')
+                                     .long("no-digits")
                                      .action(ArgAction::SetTrue))
                                 .arg(Arg::new("symbols")
                                      .help("exclude symbols")
@@ -568,7 +568,7 @@ async fn main() {
                                 trace!("Symbol characters excluded");
                                 charset.remove(CharacterSet::Symbols);
                             }
-                            if ! password.numbers {
+                            if ! password.digits {
                                 trace!("Numeric characters excluded");
                                 charset.remove(CharacterSet::Numbers);
                             }
@@ -620,6 +620,7 @@ async fn main() {
                         match serde_json::to_string(&passwords) {
                             Ok(password_pretty_json) => export_passwords(&password_pretty_json, &path),
                             Err(err) => {
+                    println!("Aqui llega");
                                 println!("{}", err);
                                 process::exit(0x0100);
                             }
@@ -744,7 +745,7 @@ async fn main() {
                                             trace!("Symbol characters excluded");
                                             charset.remove(CharacterSet::Symbols);
                                         }
-                                        if ! password.numbers {
+                                        if ! password.digits {
                                             trace!("Numeric characters excluded");
                                             charset.remove(CharacterSet::Numbers);
                                         }

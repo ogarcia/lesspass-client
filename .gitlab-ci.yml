@@ -20,7 +20,7 @@ stages:
 
 Test AMD64:
   stage: Test
-  image: rust:buster
+  image: rust:bookworm
   script:
     - cargo test
   cache:
@@ -30,7 +30,7 @@ Test AMD64:
 
 Build AMD64:
   stage: Build
-  image: rust:buster
+  image: rust:bookworm
   script:
     - cargo build --release --locked
   artifacts:
@@ -44,7 +44,7 @@ Build AMD64:
 
 Build ARM64:
   stage: Build
-  image: rust:buster
+  image: rust:bookworm
   script:
     - cargo build --release --locked
   artifacts:
