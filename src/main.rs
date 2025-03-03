@@ -4,21 +4,25 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
-#[macro_use]
-extern crate log;
-extern crate clap;
-extern crate xdg;
+use std::{fs, io, path, process};
+
 use clap::{command, value_parser, Arg, ArgAction, ArgMatches, Command};
 use env_logger::Builder;
 use lesspass::{Algorithm, CharacterSet, generate_entropy, generate_salt, render_password};
-use log::LevelFilter;
+use lesspass_client::Client;
+use lesspass_client::model::{NewPassword, Password, Passwords, User, Token};
+use log::{debug, info, trace, warn, LevelFilter};
 use reqwest::Url;
+use serde::Deserialize;
 use xdg::BaseDirectories;
-use lesspass_client::{NewPassword, NewPasswords, Password, Passwords, Token, User, Client};
 
-use std::{fs, io, path, process};
+const APP_NAME: &str = env!("CARGO_PKG_NAME");
 
-const APP_NAME: &str = "lesspass-client";
+// To create a list of new passwords
+#[derive(Debug, Deserialize)]
+struct NewPasswords {
+    pub results: Vec<NewPassword>
+}
 
 fn print_user(user: &User) {
     println!("ID: {}", user.id);
@@ -85,15 +89,6 @@ fn parse_password_matches(matches: &ArgMatches) -> NewPassword {
     }
 }
 
-async fn refresh_token(client: &Client, token: String) -> Result<Token, String> {
-    // If token is empty simply return an error
-    if token == "" || token == "\n" {
-        debug!("Token file does not exists or is empty");
-        return Err("Invalid token found".to_string())
-    }
-    client.refresh_token(token).await
-}
-
 async fn auth(client: &Client, user: Option<&String>, pass: Option<&String>) -> Token {
     // Try to get token form cache file
     let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).unwrap().place_cache_file("token") {
@@ -115,7 +110,7 @@ async fn auth(client: &Client, user: Option<&String>, pass: Option<&String>) -> 
     };
 
     // Try refresh token first
-    let requested_token = match refresh_token(client, token).await {
+    let requested_token = match client.refresh_token(&token).await {
         Ok(refreshed_token) => {
             info!("Token refreshed successfully");
             refreshed_token
@@ -139,7 +134,7 @@ async fn auth(client: &Client, user: Option<&String>, pass: Option<&String>) -> 
                 }
             };
             trace!("Using {} (value is masked) as LESSPASS_PASS", "*".repeat(pass.len()));
-            match client.create_token(user, pass).await {
+            match client.create_token(&user, &pass).await {
                 Ok(token) => token,
                 Err(err) => {
                     println!("{}", err);
@@ -168,7 +163,7 @@ async fn get_passwords(client: &Client, user: Option<&String>, pass: Option<&Str
     // First auth to get token
     let token = auth(&client, user, pass).await;
     // Get the password list
-    match client.get_passwords(token.access).await {
+    match client.get_passwords(&token.access).await {
         Ok(passwords) => {
             debug!("Password list obtained successfully");
             return passwords
@@ -478,7 +473,7 @@ async fn main() {
                     let password = user_create_sub_matches.get_one::<String>("password").unwrap().to_string();
                     trace!("Parsed new user options: '{}' '{}'", email, password);
                     info!("Creating new user");
-                    match client.create_user(email, password).await {
+                    match client.create_user(&email, &password).await {
                         Ok(()) => println!("New user created successfully"),
                         Err(err) => {
                             println!("{}", err);
@@ -493,7 +488,7 @@ async fn main() {
                     // Perform auth and get token
                     let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Deleting current user");
-                    match client.delete_user(token.access, password).await {
+                    match client.delete_user(&token.access, &password).await {
                         Ok(()) => println!("Current user deleted successfully"),
                         Err(err) => {
                             println!("{}", err);
@@ -509,7 +504,7 @@ async fn main() {
                     // Perform auth and get token
                     let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Performing password change");
-                    match client.change_user_password(token.access, old, new).await {
+                    match client.change_user_password(&token.access, &old, &new).await {
                         Ok(()) => println!("Password changed successfully"),
                         Err(err) => {
                             println!("{}", err);
@@ -521,7 +516,7 @@ async fn main() {
                     // Perform auth and get token
                     let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Returning current user info");
-                    match client.get_user(token.access).await {
+                    match client.get_user(&token.access).await {
                         Ok(user) => print_user(&user),
                         Err(err) => {
                             println!("{}", err);
@@ -540,7 +535,7 @@ async fn main() {
                     // Perform auth and get token
                     let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Creating new password");
-                    match client.post_password(token.access, &new_password).await {
+                    match client.post_password(&token.access, &new_password).await {
                         Ok(()) => println!("New password created successfully"),
                         Err(err) => {
                             println!("{}", err);
@@ -594,7 +589,7 @@ async fn main() {
                     // Perform auth and get token
                     let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Deleting password {}", id);
-                    match client.delete_password(token.access, id).await {
+                    match client.delete_password(&token.access, &id).await {
                         Ok(()) => println!("Password deleted successfully"),
                         Err(err) => {
                             println!("{}", err);
@@ -620,7 +615,6 @@ async fn main() {
                         match serde_json::to_string(&passwords) {
                             Ok(password_pretty_json) => export_passwords(&password_pretty_json, &path),
                             Err(err) => {
-                    println!("Aqui llega");
                                 println!("{}", err);
                                 process::exit(0x0100);
                             }
@@ -661,7 +655,7 @@ async fn main() {
                             let mut error = false;
                             for password in passwords.results.iter() {
                                 info!("Importing site {}", &password.site);
-                                match client.post_password(token.access.to_string(), &password).await {
+                                match client.post_password(&token.access, &password).await {
                                     Ok(()) => debug!("Site {} imported successfully", &password.site),
                                     Err(err) => {
                                         error = true;
@@ -785,7 +779,7 @@ async fn main() {
                     // Perform auth and get token
                     let token = auth(&client, matches.get_one::<String>("username"), matches.get_one::<String>("password")).await;
                     info!("Updating password {}", id);
-                    match client.put_password(token.access, id, &new_password).await {
+                    match client.put_password(&token.access, &id, &new_password).await {
                         Ok(()) => println!("Password updated successfully"),
                         Err(err) => {
                             println!("{}", err);

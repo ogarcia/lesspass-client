@@ -1,6 +1,6 @@
 [package]
 name = "lesspass-client"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["Óscar García Amor <ogarcia@connectical.com>"]
 edition = "2021"
 description = "LessPass API server client library and CLI written in Rust"
@@ -11,7 +11,7 @@ keywords = ["lesspass", "library", "password", "client", "cli"]
 categories = ["api-bindings", "command-line-utilities", "web-programming::http-client"]
 
 [lib]
-path = "src/lib.rs"
+path = "src/lib/mod.rs"
 
 [[bin]]
 name = "lesspass-client"
@@ -19,20 +19,21 @@ path = "src/main.rs"
 required-features = ["default"]
 
 [dependencies]
-chrono = { version="~0.4", features = ["serde"] }
-log = "~0.4"
-reqwest = { version = "~0.12", features = ["json"] }
-serde = { version = "~1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
+url = "2.5"
 
-clap = { version = "~4.5", features = ["cargo", "env"], optional = true }
-env_logger = { version = "~0.11", optional = true }
-lesspass = { version = "~0.4", optional = true }
-serde_json = { version = "~1.0", optional = true }
-xdg = { version = "~2.5", optional = true }
+clap = { version = "4.5", features = ["cargo", "env"], optional = true }
+env_logger = { version = "0.11", optional = true }
+lesspass = { version = "0.4", optional = true }
+serde_json = { version = "1.0", optional = true }
+xdg = { version = "2.5", optional = true }
 
 [dev-dependencies]
-mockito = "~1.6"
+mockito = "1.6"
 
 [features]
 default = ["clap", "env_logger", "lesspass", "serde_json", "xdg"]
