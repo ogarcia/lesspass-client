@@ -146,3 +146,24 @@ fn date_deserializer<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
         Err(_) => s.parse::<DateTime<Utc>>().map_err(serde::de::Error::custom)
     }
 }
+
+/// Turns a NewPassword into a Password using empty string for id and current date for created and
+/// modified fields
+impl From<NewPassword> for Password {
+    fn from(new_password: NewPassword) -> Self {
+        Password {
+            id: String::new(),
+            site: new_password.site,
+            login: new_password.login,
+            lowercase: new_password.lowercase,
+            uppercase: new_password.uppercase,
+            symbols: new_password.symbols,
+            digits: new_password.digits,
+            length: new_password.length,
+            counter: new_password.counter,
+            version: new_password.version,
+            created: Utc::now(),
+            modified: Utc::now()
+        }
+    }
+}

@@ -89,6 +89,37 @@ fn parse_password_matches(matches: &ArgMatches) -> NewPassword {
     }
 }
 
+fn generate_password(password: impl Into<Password>, masterpass: &str) -> String {
+    let password = password.into();
+    trace!("Using {} (value is masked) as master password", "*".repeat(masterpass.len()));
+    info!("Returning site password");
+    let mut charset = CharacterSet::All;
+    if ! password.lowercase {
+        trace!("Lowercase characters excluded");
+        charset.remove(CharacterSet::Lowercase);
+    }
+    if ! password.uppercase {
+        trace!("Uppercase characters excluded");
+        charset.remove(CharacterSet::Uppercase);
+    }
+    if ! password.symbols {
+        trace!("Symbol characters excluded");
+        charset.remove(CharacterSet::Symbols);
+    }
+    if ! password.digits {
+        trace!("Numeric characters excluded");
+        charset.remove(CharacterSet::Digits);
+    }
+    if charset.is_empty() {
+        println!("There is a problem with site settings, all characters have been excluded");
+        process::exit(0x0100);
+    }
+    let salt = generate_salt(&password.site, &password.login, password.counter);
+    let entropy = generate_entropy(&masterpass, &salt, Algorithm::SHA256, 100000);
+    let password = render_password(&entropy, charset, password.length.into());
+    password
+}
+
 async fn auth(client: &Client, user: Option<&String>, pass: Option<&String>) -> Token {
     // Try to get token form cache file
     let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).unwrap().place_cache_file("token") {
@@ -548,32 +579,7 @@ async fn main() {
                     trace!("Parsed site options: {:?}", password);
                     match matches.get_one::<String>("masterpass") {
                         Some(masterpass) => {
-                            trace!("Using {} (value is masked) as master password", "*".repeat(masterpass.len()));
-                            info!("Returning site password");
-                            let mut charset = CharacterSet::All;
-                            if ! password.lowercase {
-                                trace!("Lowercase characters excluded");
-                                charset.remove(CharacterSet::Lowercase);
-                            }
-                            if ! password.uppercase {
-                                trace!("Uppercase characters excluded");
-                                charset.remove(CharacterSet::Uppercase);
-                            }
-                            if ! password.symbols {
-                                trace!("Symbol characters excluded");
-                                charset.remove(CharacterSet::Symbols);
-                            }
-                            if ! password.digits {
-                                trace!("Numeric characters excluded");
-                                charset.remove(CharacterSet::Numbers);
-                            }
-                            if charset.is_empty() {
-                                println!("There is a problem with site settings, all characters have been excluded");
-                                process::exit(0x0100);
-                            }
-                            let salt = generate_salt(&password.site, &password.login, password.counter);
-                            let entropy = generate_entropy(&masterpass, &salt, Algorithm::SHA256, 100000);
-                            let password = render_password(&entropy, charset, password.length.into());
+                            let password = generate_password(password, masterpass);
                             println!("{}", password);
                         },
                         None => {
@@ -729,32 +735,7 @@ async fn main() {
                             if password_show_sub_matches.get_flag("password") {
                                 match matches.get_one::<String>("masterpass") {
                                     Some(masterpass) => {
-                                        trace!("Using {} (value is masked) as master password", "*".repeat(masterpass.len()));
-                                        info!("Returning site password");
-                                        let mut charset = CharacterSet::All;
-                                        if ! password.lowercase {
-                                            trace!("Lowercase characters excluded");
-                                            charset.remove(CharacterSet::Lowercase);
-                                        }
-                                        if ! password.uppercase {
-                                            trace!("Uppercase characters excluded");
-                                            charset.remove(CharacterSet::Uppercase);
-                                        }
-                                        if ! password.symbols {
-                                            trace!("Symbol characters excluded");
-                                            charset.remove(CharacterSet::Symbols);
-                                        }
-                                        if ! password.digits {
-                                            trace!("Numeric characters excluded");
-                                            charset.remove(CharacterSet::Numbers);
-                                        }
-                                        if charset.is_empty() {
-                                            println!("There is a problem with site settings, all characters have been excluded");
-                                            process::exit(0x0100);
-                                        }
-                                        let salt = generate_salt(&password.site, &password.login, password.counter);
-                                        let entropy = generate_entropy(&masterpass, &salt, Algorithm::SHA256, 100000);
-                                        let password = render_password(&entropy, charset, password.length.into());
+                                        let password = generate_password(password.clone(), masterpass);
                                         println!("{}", password);
                                     },
                                     None => {
