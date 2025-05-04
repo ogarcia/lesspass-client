@@ -119,6 +119,11 @@ impl Client {
         self.request(Method::DELETE, &url, Some(token), json).await
     }
 
+    /// Parse self configured url as Url
+    pub fn parse_url(&self) -> Result<Url> {
+        Ok(Url::parse(&self.url)?)
+    }
+
     /// Create a new token (perform initial auth with email and password)
     pub async fn create_token(&self, email: &str, password: &str) -> Result<Token> {
         debug!("Requesting new token");
@@ -211,6 +216,23 @@ mod tests {
     use mockito::{Matcher, Server};
 
     const JH: (&str, &str) = ("content-type", "application/json");
+
+    #[test]
+    fn parse_url() {
+        let url = Client::new("http://localhost").parse_url().unwrap();
+        assert_eq!("http", url.scheme());
+        assert_eq!(Some("localhost"), url.host_str());
+        assert_eq!(Some(80), url.port_or_known_default());
+        let url = Client::new("https://localhost").parse_url().unwrap();
+        assert_eq!("https", url.scheme());
+        assert_eq!(Some(443), url.port_or_known_default());
+        let url = Client::new("https://example.com:6666").parse_url().unwrap();
+        assert_eq!(Some("example.com"), url.host_str());
+        assert_eq!(Some(6666), url.port_or_known_default());
+        // Bad configured client
+        let url_error = Client::new("bad").parse_url().unwrap_err();
+        assert_eq!("URL parse error, relative URL without a base", url_error.to_string());
+    }
 
     #[tokio::test]
     async fn create_token() {

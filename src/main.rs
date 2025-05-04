@@ -12,7 +12,6 @@ use lesspass::{Algorithm, CharacterSet, generate_entropy, generate_salt, render_
 use lesspass_client::Client;
 use lesspass_client::model::{NewPassword, Password, Passwords, User, Token};
 use log::{debug, info, trace, warn, LevelFilter};
-use reqwest::Url;
 use serde::Deserialize;
 use xdg::BaseDirectories;
 
@@ -121,8 +120,11 @@ fn generate_password(password: impl Into<Password>, masterpass: &str) -> String 
 }
 
 async fn auth(client: &Client, user: Option<&String>, pass: Option<&String>) -> Token {
+    // Is safe to unwrap since url is checked at program startup
+    let url = client.parse_url().unwrap();
+
     // Try to get token form cache file
-    let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).place_cache_file("token") {
+    let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).place_cache_file(format!("{}.token", url.host_str().unwrap_or_else(|| url.as_str()).replace('/', ""))) {
         Ok(token_cache_file) => {
             debug!("Using cache file {} for read and store token", token_cache_file.as_path().display());
             token_cache_file
@@ -484,17 +486,14 @@ async fn main() {
     info!("Log level {:?}", log::max_level());
     trace!("Using {} as LESSPASS_HOST", host);
 
-    // Validate host
-    let host = match Url::parse(&host) {
-        Ok(host) => host,
-        Err(_) => {
-            println!("LESSPASS_HOST {} is not a valid URL", host);
-            process::exit(0x0100);
-        }
-    };
-
     // Configure client
     let client = Client::new(host);
+
+    // Validate host
+    if let Err(_) = client.parse_url() {
+        println!("LESSPASS_HOST {host} is not a valid URL");
+        process::exit(0x0100);
+    }
 
     match matches.subcommand() {
         Some(("user", user_sub_matches)) => {
