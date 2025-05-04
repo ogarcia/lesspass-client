@@ -122,7 +122,7 @@ fn generate_password(password: impl Into<Password>, masterpass: &str) -> String 
 
 async fn auth(client: &Client, user: Option<&String>, pass: Option<&String>) -> Token {
     // Try to get token form cache file
-    let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).unwrap().place_cache_file("token") {
+    let token_cache_file = match BaseDirectories::with_prefix(APP_NAME).place_cache_file("token") {
         Ok(token_cache_file) => {
             debug!("Using cache file {} for read and store token", token_cache_file.as_path().display());
             token_cache_file
@@ -398,6 +398,7 @@ async fn main() {
                                      .value_parser(value_parser!(path::PathBuf))))
                     .subcommand(Command::new("list")
                                 .about("List all passwords")
+                                .visible_alias("ls")
                                 .arg(Arg::new("full")
                                      .help("get full list (not only sites)")
                                      .short('f')
