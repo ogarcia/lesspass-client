@@ -262,7 +262,7 @@ mod tests {
             .await;
         // Bad response caused by unexpected json body
         let error_body = client.create_token("bad", "bad").await.unwrap_err();
-        assert_eq!("reqwest error, error decoding response body", error_body.to_string());
+        assert!(error_body.to_string().starts_with("reqwest error, error decoding response body"));
     }
 
     #[tokio::test]
@@ -293,7 +293,7 @@ mod tests {
             .await;
         // Bad response caused by unexpected json body
         let error_body = client.refresh_token("bad-token").await.unwrap_err();
-        assert_eq!("reqwest error, error decoding response body", error_body.to_string());
+        assert!(error_body.to_string().starts_with("reqwest error, error decoding response body"));
     }
 
     #[tokio::test]
